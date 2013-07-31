@@ -1,6 +1,8 @@
 package typing
 
 import (
+    "fmt"
+    "reflect"
     "go/ast"
     "go/token"
 )
@@ -29,7 +31,21 @@ func ComplexType() Type {
     return Type{"complex"}
 }
 
+type Indentation int
+func (indent Indentation) String() string {
+    out := ""
+    for i :=0; i < int(indent); i++ {
+        out += "  "
+    }
+    return out
+}
+
+var indent Indentation = 0
+
 func getTypes(n ast.Node) Type {
+    indent++
+    defer func() { indent-- }()
+    fmt.Printf("%vNode type = %v\n", indent, reflect.TypeOf(n))
     switch t := n.(type) {
     case *ast.BasicLit:
         switch t.Kind {
@@ -43,14 +59,43 @@ func getTypes(n ast.Node) Type {
             return CharType()
         case token.IMAG:
             return ComplexType()
+        default:
+            fmt.Printf("Unhandled BasicLit: %v\n", reflect.TypeOf(t.Kind))
         }
     case *ast.BinaryExpr:
         xType := getTypes(t.X)
         yType := getTypes(t.Y)
         if xType == yType {
             return xType
+        } else {
+            fmt.Printf("Unhandled BinaryExpr: %v vs %v\n", xType, yType)
         }
+    case *ast.Ident:
+        switch it := t.Obj.Type.(type) {
+        case Type:
+            return it
+        default:
+            fmt.Printf("Unhandled Ident.Obj.Type: %v\n", reflect.TypeOf(t.Obj.Type))
+        }
+        switch de := t.Obj.Decl.(type) {
+        case ast.Node:
+            return getTypes(de)
+        default:
+            fmt.Printf("Unhandled Ident.Obj.Decl: %v (data: %v)\n", reflect.TypeOf(t.Obj.Decl), reflect.TypeOf(t.Obj.Data))
+        }
+        return Type{"UNKNOWN!!!"}
+    case *ast.Field:
+        switch tt := t.Type.(type) {
+        case *ast.Ident:
+            return getTypes(tt)
+        default:
+            fmt.Printf("Unhandled Field: %v\n", reflect.TypeOf(tt))
+        }
+        return Type{"???"}
+    default:
+        fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
+    fmt.Printf("Returning 'UNKNOWN'\n")
     return Type{"UNKNOWN"}
 }
 
@@ -60,18 +105,27 @@ type TypeFillingVisitor struct {
 // We'll have to hide the first 'case *ast.Ident' within a Return case.
 // Then we'll have to create a new 'case *ast.AssignStmt' to handle the new test
 func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
-    switch t := n.(type) {
-    // UGH!!
-    case *ast.Ident:
-        if t.Obj.Kind == ast.Var {
-            switch f := t.Obj.Decl.(type) {
-            case *ast.Field:
-                switch i := f.Type.(type) {
-                case *ast.Ident:
-                    if i.Name == "int" {
-                        t.Obj.Type = Type{"int"}
+    switch r := n.(type) {
+    case *ast.ReturnStmt:
+        switch t := r.Results[0].(type) {
+        case *ast.Ident:
+            if t.Obj.Kind == ast.Var {
+                switch f := t.Obj.Decl.(type) {
+                case *ast.Field:
+                    switch i := f.Type.(type) {
+                    case *ast.Ident:
+                        if i.Name == "int" {
+                            t.Obj.Type = Type{"int"}
+                        }
                     }
                 }
+            }
+        }
+    case *ast.AssignStmt:
+        switch t := r.Lhs[0].(type) {
+        case *ast.Ident:
+            if t.Obj.Kind == ast.Var {
+                t.Obj.Type = getTypes(r.Rhs[0])
             }
         }
     }

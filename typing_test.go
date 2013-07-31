@@ -67,6 +67,7 @@ func TestFillsTypeOfExpression(t *testing.T) {
 
 
 // Need to figure out exactly what we're trying to do here...
+// Well EFFF - ParseExpr doesn't seem to populate variable info. I need 'a' to have Ident.Obj data populated, but it's not. It might be an oversight: solitary expressions don't usually define variables.
 func TestFillsTypeOfVarInAssignment(t *testing.T) {
     i, _ := parser.ParseExpr("func (a int) int { b := a + 2; return b }")
     switch i2 := i.(type) {
