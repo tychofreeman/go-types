@@ -5,6 +5,8 @@ import (
     . "github.com/tychofreeman/go-matchers"
     "go/ast"
     "go/parser"
+    "go/token"
+    "reflect"
 )
 
 func getTypeOfExpr(expr string) Type {
@@ -65,29 +67,40 @@ func TestFillsTypeOfExpression(t *testing.T) {
     }
 }
 
-
-// Need to figure out exactly what we're trying to do here...
-// Well EFFF - ParseExpr doesn't seem to populate variable info. I need 'a' to have Ident.Obj data populated, but it's not. It might be an oversight: solitary expressions don't usually define variables.
-func TestFillsTypeOfVarInAssignment(t *testing.T) {
-    i, _ := parser.ParseExpr("func (a int) int { b := a + 2; return b }")
-    switch i2 := i.(type) {
+type FuncVisitor struct {
+    t *testing.T
+}
+func (fv FuncVisitor) Visit(n ast.Node) ast.Visitor {
+    if n == nil {
+        return fv
+    }
+    fv.t.Log("walking ast.Node=", reflect.TypeOf(n))
+    switch i2 := n.(type) {
     case *ast.FuncLit:
+        fv.t.Log("Found Function Literal...\n")
         rtn := i2.Body.List[0]
         switch rtn2 := rtn.(type) {
         case *ast.AssignStmt:
             switch i3 := rtn2.Lhs[0].(type) {
             case *ast.Ident:
-                AssertThat(t, i3.Obj.Type, Equals(nil))
-                fillTypes(i)
-                AssertThat(t, i3.Obj.Type, Equals(Type{"int"}))
+                AssertThat(fv.t, i3.Obj.Type, Equals(nil))
+                fillTypes(n)
+                AssertThat(fv.t, i3.Obj.Type, Equals(Type{"int"}))
             default:
-                t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
+                fv.t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
             }
         default:
-            t.Error("Expected to find a return statment at Expr.FuncLit.Body.List[0]")
+            fv.t.Error("Expected to find a return statment at Expr.FuncLit.Body.List[0]")
         }
-    default:
-        t.Error()
     }
+    return fv
+}
+
+// Need to figure out exactly what we're trying to do here...
+// Well EFFF - ParseExpr doesn't seem to populate variable info. I need 'a' to have Ident.Obj data populated, but it's not. It might be an oversight: solitary expressions don't usually define variables.
+func TestFillsTypeOfVarInAssignment(t *testing.T) {
+    f, _ := parser.ParseFile(token.NewFileSet(), "tmp.go", "func (a int) int { b := a + 2; return b }", parser.ParseComments)
+    visitor := FuncVisitor{t}
+    ast.Walk(visitor, f)
 }
 

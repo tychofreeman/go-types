@@ -71,11 +71,27 @@ func getTypes(n ast.Node) Type {
             fmt.Printf("Unhandled BinaryExpr: %v vs %v\n", xType, yType)
         }
     case *ast.Ident:
-        switch it := t.Obj.Type.(type) {
-        case Type:
-            return it
-        default:
-            fmt.Printf("Unhandled Ident.Obj.Type: %v\n", reflect.TypeOf(t.Obj.Type))
+        if t.Obj == nil {
+            switch t.Name {
+            case "int":
+                return IntType()
+            case "string":
+                return StringType()
+            case "float":
+                return FloatType()
+            case "char":
+                return CharType()
+            default:
+                return Type{"TYPE IDENT " + t.Name}
+            }
+        }
+        if t.Obj.Type != nil {
+            switch it := t.Obj.Type.(type) {
+            case Type:
+                return it
+            default:
+                fmt.Printf("Unhandled Ident.Obj.Type: %v\n", reflect.TypeOf(t.Obj.Type))
+            }
         }
         switch de := t.Obj.Decl.(type) {
         case ast.Node:
