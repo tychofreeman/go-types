@@ -68,37 +68,41 @@ func TestFillsTypeOfExpression(t *testing.T) {
 }
 
 type FuncVisitor struct {
-    t *testing.T
+    f func(n ast.Node)
 }
 func (fv FuncVisitor) Visit(n ast.Node) ast.Visitor {
-    if n == nil {
-        return fv
-    }
-    fv.t.Log("walking ast.Node=", reflect.TypeOf(n))
-    switch i2 := n.(type) {
-    case *ast.FuncLit:
-        fv.t.Log("Found Function Literal...\n")
-        rtn := i2.Body.List[0]
-        switch rtn2 := rtn.(type) {
-        case *ast.AssignStmt:
-            switch i3 := rtn2.Lhs[0].(type) {
-            case *ast.Ident:
-                AssertThat(fv.t, i3.Obj.Type, Equals(nil))
-                fillTypes(n)
-                AssertThat(fv.t, i3.Obj.Type, Equals(Type{"int"}))
-            default:
-                fv.t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
-            }
-        default:
-            fv.t.Error("Expected to find a return statment at Expr.FuncLit.Body.List[0]")
-        }
-    }
+    fv.f(n)
     return fv
 }
 
 func TestFillsTypeOfVarInAssignment(t *testing.T) {
     f, _ := parser.ParseFile(token.NewFileSet(), "tmp.go", "func (a int) int { b := a + 2; return b }", parser.ParseComments)
-    visitor := FuncVisitor{t}
+    visitor := FuncVisitor{
+        func(n ast.Node) {
+            if n == nil {
+                return
+            }
+            t.Log("walking ast.Node=", reflect.TypeOf(n))
+            switch i2 := n.(type) {
+            case *ast.FuncLit:
+                t.Log("Found Function Literal...\n")
+                rtn := i2.Body.List[0]
+                switch rtn2 := rtn.(type) {
+                case *ast.AssignStmt:
+                    switch i3 := rtn2.Lhs[0].(type) {
+                    case *ast.Ident:
+                        AssertThat(t, i3.Obj.Type, Equals(nil))
+                        fillTypes(n)
+                        AssertThat(t, i3.Obj.Type, Equals(Type{"int"}))
+                    default:
+                        t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
+                    }
+                default:
+                    t.Error("Expected to find a return statment at Expr.FuncLit.Body.List[0]")
+                }
+            }
+        },
+    }
     ast.Walk(visitor, f)
 }
 

@@ -31,21 +31,7 @@ func ComplexType() Type {
     return Type{"complex"}
 }
 
-type Indentation int
-func (indent Indentation) String() string {
-    out := ""
-    for i :=0; i < int(indent); i++ {
-        out += "  "
-    }
-    return out
-}
-
-var indent Indentation = 0
-
 func getTypes(n ast.Node) Type {
-    indent++
-    defer func() { indent-- }()
-    fmt.Printf("%vNode type = %v\n", indent, reflect.TypeOf(n))
     switch t := n.(type) {
     case *ast.BasicLit:
         switch t.Kind {
