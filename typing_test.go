@@ -96,8 +96,6 @@ func (fv FuncVisitor) Visit(n ast.Node) ast.Visitor {
     return fv
 }
 
-// Need to figure out exactly what we're trying to do here...
-// Well EFFF - ParseExpr doesn't seem to populate variable info. I need 'a' to have Ident.Obj data populated, but it's not. It might be an oversight: solitary expressions don't usually define variables.
 func TestFillsTypeOfVarInAssignment(t *testing.T) {
     f, _ := parser.ParseFile(token.NewFileSet(), "tmp.go", "func (a int) int { b := a + 2; return b }", parser.ParseComments)
     visitor := FuncVisitor{t}
