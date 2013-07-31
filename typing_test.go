@@ -75,8 +75,13 @@ func (fv FuncVisitor) Visit(n ast.Node) ast.Visitor {
     return fv
 }
 
+func ParseFile(contents string) (f *ast.File) {
+    f, _ = parser.ParseFile(token.NewFileSet(), "tmp.go", "func (a int) int { b := a + 2; return b }", parser.ParseComments)
+    return
+}
+
 func TestFillsTypeOfVarInAssignment(t *testing.T) {
-    f, _ := parser.ParseFile(token.NewFileSet(), "tmp.go", "func (a int) int { b := a + 2; return b }", parser.ParseComments)
+    f := ParseFile("func (a int) int { b := a + 2; return b }")
     visitor := FuncVisitor{
         func(n ast.Node) {
             if n == nil {
@@ -106,3 +111,5 @@ func TestFillsTypeOfVarInAssignment(t *testing.T) {
     ast.Walk(visitor, f)
 }
 
+func TestFillsTypeOfVarAssignedToCast(t *testing.T) {
+}
