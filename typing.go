@@ -31,6 +31,10 @@ func ComplexType() Type {
     return Type{"complex"}
 }
 
+func FuncType() Type {
+    return Type{"func"}
+}
+
 func getTypes(n ast.Node) Type {
     switch t := n.(type) {
     case *ast.BasicLit:
