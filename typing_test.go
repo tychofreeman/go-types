@@ -54,7 +54,7 @@ func TestFillsTypeOfExpression(t *testing.T) {
             case *ast.Ident:
                 AssertThat(t, i3.Obj.Type, Equals(nil))
                 fillTypes(i)
-                AssertThat(t, i3.Obj.Type, Equals(Type{"int"}))
+                AssertThat(t, i3.Obj.Type, Equals(IntType()))
             default:
                 t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
             }
@@ -136,7 +136,7 @@ func TestFillsTypeOfFuncName(t *testing.T) {
         func(n ast.Node) {
             switch ident := n.(type) {
             case *ast.Ident:
-                if ident.Name == "a" {
+                if ident.Name == "f" {
                     if ident.Obj == nil {
                         t.Errorf("indent.Obj should not be nil")
                     } else if ident.Obj.Type == nil {
@@ -150,7 +150,7 @@ func TestFillsTypeOfFuncName(t *testing.T) {
 }
 
 func TestFillsVarAssignedToCallOfFunc(t *testing.T) {
-    f := ParseFile("TestFillsVarAssignedToCallOfFunc", "func f(a int) int { return a * 2 }\nfunc g() {b := f(3)}")
+    f := ParseFile("TestFillsVarAssignedToCallOfFunc", "package main\nfunc f(a int) int { return a * 2 }\nfunc g() {b := f(3)}")
     fillTypes(f)
     bWasFound := false
     v := FuncVisitor {
@@ -166,4 +166,22 @@ func TestFillsVarAssignedToCallOfFunc(t *testing.T) {
     }
     ast.Walk(v, f)
     AssertThat(t, bWasFound, IsTrue)
+}
+
+func TestFillsVarWithTypeAlias(t *testing.T) {
+    f := ParseFile("TestFillsvarWithTypeAlias", "package main\ntype A int\nfunc f(a A) { b := A(a) }")
+    fillTypes(f)
+    var types []interface{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                if ident.Name == "a" {
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+    ast.Walk(v, f)
+    AssertThat(t, types, HasExactly(AliasType(IntType()),AliasType(IntType())))
 }

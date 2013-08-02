@@ -7,32 +7,93 @@ import (
     "go/token"
 )
 
-type Type struct {
+type Type interface {
+    String() string
+}
+
+type NoneType struct{}
+
+func (n NoneType) String() string {
+    return "<UNKOWN TYPE>"
+}
+
+type SimpleType struct {
     name string
 }
 
+func (s SimpleType) String() string {
+    return s.name
+}
+
+type FunctionType struct {
+    receiver *Type
+    params []Type
+    returns []Type
+}
+
+func (f FunctionType) String() string {
+    return "func"
+}
+    
+
+type AliasedType struct {
+    name string
+    wrapped Type
+}
+
+func (a AliasedType) String() string {
+    return "type " + a.name + " " + a.wrapped.String()   
+}
+
+func UnknownType(data string) Type {
+    return NoneType{}
+}
+
 func StringType() Type {
-    return Type{"string"}
+    return SimpleType{"string"}
 }
 
 func IntType() Type {
-    return Type{"int"}
+    return SimpleType{"int"}
 }
 
 func FloatType() Type {
-    return Type{"float"}
+    return SimpleType{"float"}
 }
 
 func CharType() Type {
-    return Type{"char"}
+    return SimpleType{"char"}
 }
 
 func ComplexType() Type {
-    return Type{"complex"}
+    return SimpleType{"complex"}
 }
 
-func FuncType() Type {
-    return Type{"func"}
+func AliasType(aliased Type) Type {
+    return AliasedType{"", aliased}
+}
+
+func FuncType(recv *ast.FieldList, params, results []*ast.Field) Type {
+    
+    paramList := []Type{}
+    rtnList := []Type{}
+    var firstRtnType Type = nil
+    if len(results) == 0 {
+        return NoneType{}
+    }
+    if len(results[0].Names) > 0 {
+        firstRtnType = getTypes(results[0].Names[0])
+    }
+    switch firstRtnType.(type) {
+    case NoneType:
+        rtnList = append(rtnList, getTypes(results[0].Type))
+    case nil:
+        rtnList = append(rtnList, getTypes(results[0].Type))
+    default:
+        rtnList = append(rtnList, firstRtnType)
+    }
+
+    return FunctionType{receiver:nil, params:paramList, returns:rtnList}
 }
 
 func getTypes(n ast.Node) Type {
@@ -60,6 +121,25 @@ func getTypes(n ast.Node) Type {
         } else {
             fmt.Printf("Unhandled BinaryExpr: %v vs %v\n", xType, yType)
         }
+    case *ast.CallExpr:
+        fnType := getTypes(t.Fun)
+        switch fnType := fnType.(type) {
+        case FunctionType:
+            if len(fnType.returns) > 0 {
+                return fnType.returns[0]
+            } else {
+                return NoneType{}
+            }
+        }
+        return UnknownType("Wierd Call expression")
+    case *ast.FuncDecl:
+        return FuncType(nil, nil, t.Type.Results.List)
+    case *ast.FuncType:
+        if t.Results != nil {
+            return FuncType(nil, nil, t.Results.List)
+        } else {
+            return FuncType(nil, nil, []*ast.Field{})
+        }
     case *ast.Ident:
         if t.Obj == nil {
             switch t.Name {
@@ -72,7 +152,7 @@ func getTypes(n ast.Node) Type {
             case "char":
                 return CharType()
             default:
-                return Type{"TYPE IDENT " + t.Name}
+                return UnknownType("TYPE IDENT " + t.Name)
             }
         }
         if t.Obj.Type != nil {
@@ -89,7 +169,7 @@ func getTypes(n ast.Node) Type {
         default:
             fmt.Printf("Unhandled Ident.Obj.Decl: %v (data: %v)\n", reflect.TypeOf(t.Obj.Decl), reflect.TypeOf(t.Obj.Data))
         }
-        return Type{"UNKNOWN!!!"}
+        return UnknownType("UNKNOWN!!!")
     case *ast.Field:
         switch tt := t.Type.(type) {
         case *ast.Ident:
@@ -97,12 +177,14 @@ func getTypes(n ast.Node) Type {
         default:
             fmt.Printf("Unhandled Field: %v\n", reflect.TypeOf(tt))
         }
-        return Type{"???"}
+        return UnknownType("???")
+    case *ast.TypeSpec:
+        return AliasedType{t.Name.Name, getTypes(t.Type)}
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
     fmt.Printf("Returning 'UNKNOWN'\n")
-    return Type{"UNKNOWN"}
+    return UnknownType("UNKNOWN")
 }
 
 type TypeFillingVisitor struct {
@@ -121,7 +203,7 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
                     switch i := f.Type.(type) {
                     case *ast.Ident:
                         if i.Name == "int" {
-                            t.Obj.Type = Type{"int"}
+                            t.Obj.Type = IntType()
                         }
                     }
                 }
@@ -134,6 +216,10 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
                 t.Obj.Type = getTypes(r.Rhs[0])
             }
         }
+    case *ast.FuncDecl:
+        r.Name.Obj.Type = getTypes(r.Type)
+        // Add handling of parameter and results here...
+    default:
     }
     return v
 }
