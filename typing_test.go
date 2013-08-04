@@ -221,3 +221,54 @@ func TestFillsAllReturnValuesInFuncDef(t *testing.T) {
     ast.Walk(v, f)
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
 }
+
+func TestFillsAllReturnAndParamTypesInFuncLiteral(t *testing.T) {
+    f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc init() { fn := func(a,b int, c float) (d,e string, f rune) { return } }")
+    fillTypes(f)
+    var types []interface{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "a", "b", "c", "d", "e", "f":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+    ast.Walk(v, f)
+    AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType(),StringType(),StringType(),RuneType()))
+}
+
+func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
+    f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc fn(a,b int, c float) (d,e string, f rune) { return }")
+    fillTypes(f)
+    types := []FunctionType{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "fn":
+                    switch funcType := ident.Obj.Type.(type) {
+                    case FunctionType:
+                        types = append(types, funcType)
+                    }
+                }
+            }
+        },
+    }
+    ast.Walk(v, f)
+    AssertThat(t, types[0].receiver, Equals(nil))
+    params := []interface{}{}
+    for _, p := range types[0].params {
+        params = append(params, p)
+    }
+    returns := []interface{}{}
+    for _, p := range types[0].returns {
+        returns = append(returns, p)
+    }
+    AssertThat(t, params, HasExactly(IntType(),IntType(),FloatType()))
+    AssertThat(t, returns,HasExactly(StringType(),StringType(),RuneType()))
+}

@@ -53,6 +53,10 @@ func StringType() Type {
     return SimpleType{"string"}
 }
 
+func RuneType() Type {
+    return SimpleType{"rune"}
+}
+
 func IntType() Type {
     return SimpleType{"int"}
 }
@@ -73,7 +77,11 @@ func AliasType(aliased Type) Type {
     return AliasedType{"", aliased}
 }
 
-func FuncType(recv *ast.FieldList, params, results []*ast.Field) Type {
+func FuncType(recv *Type, paramList, results []Type) Type {
+    return FunctionType{receiver:recv, params:paramList, returns:results}
+}
+
+func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
     
     paramList := []Type{}
     rtnList := []Type{}
@@ -133,13 +141,14 @@ func getTypes(n ast.Node) Type {
         }
         return UnknownType("Wierd Call expression")
     case *ast.FuncDecl:
-        return FuncType(nil, nil, t.Type.Results.List)
+        return funcType(nil, nil, t.Type.Results.List)
     case *ast.FuncType:
+        results := []*ast.Field{}
+        params := []*ast.Field{}
         if t.Results != nil {
-            return FuncType(nil, nil, t.Results.List)
-        } else {
-            return FuncType(nil, nil, []*ast.Field{})
+            results = t.Results.List
         }
+        return funcType(nil, params, results)
     case *ast.Ident:
         if t.Obj == nil {
             switch t.Name {
@@ -151,6 +160,8 @@ func getTypes(n ast.Node) Type {
                 return FloatType()
             case "char":
                 return CharType()
+            case "rune":
+                return RuneType()
             default:
                 return UnknownType("TYPE IDENT " + t.Name)
             }
@@ -206,15 +217,17 @@ func fillFieldList(fs *ast.FieldList) {
 func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
     switch r := n.(type) {
     case *ast.ReturnStmt:
-        switch t := r.Results[0].(type) {
-        case *ast.Ident:
-            if t.Obj.Kind == ast.Var {
-                switch f := t.Obj.Decl.(type) {
-                case *ast.Field:
-                    switch i := f.Type.(type) {
-                    case *ast.Ident:
-                        if i.Name == "int" {
-                            t.Obj.Type = IntType()
+        for _, result := range r.Results {
+            switch t := result.(type) {
+            case *ast.Ident:
+                if t.Obj.Kind == ast.Var {
+                    switch f := t.Obj.Decl.(type) {
+                    case *ast.Field:
+                        switch i := f.Type.(type) {
+                        case *ast.Ident:
+                            if i.Name == "int" {
+                                t.Obj.Type = IntType()
+                            }
                         }
                     }
                 }
@@ -228,7 +241,12 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
             }
         }
     case *ast.FuncDecl:
-        r.Name.Obj.Type = getTypes(r.Type)
+        fillFieldList(r.Type.Params)
+        fillFieldList(r.Type.Results)
+        if r.Name != nil && r.Name.Obj != nil {
+            r.Name.Obj.Type = getTypes(r.Type)
+        }
+    case *ast.FuncLit:
         fillFieldList(r.Type.Params)
         fillFieldList(r.Type.Results)
     default:
