@@ -361,4 +361,24 @@ func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
     AssertThat(t, types, HasExactly(IntType()))
 }
 
+func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
+    f := ParseFile("TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct", "package main\ntype A struct {\nB int\n}\ntype D struct {\nA\n}\n func f(a D) { c := a.B }")
+    fillTypes(f)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "c":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
+    AssertThat(t, types, HasExactly(IntType()))
+}
+
 // Next, add one for namespaces
