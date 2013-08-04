@@ -81,8 +81,8 @@ func FuncType(recv *Type, paramList, results []Type) Type {
     return FunctionType{receiver:recv, params:paramList, returns:results}
 }
 
+// Create a FunctionType from the information found in the AST.
 func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
-    
     paramList := []Type{}
     for _, param := range params {
         for _, paramIdent := range param.Names {
