@@ -185,3 +185,39 @@ func TestFillsVarWithTypeAlias(t *testing.T) {
     ast.Walk(v, f)
     AssertThat(t, types, HasExactly(AliasType(IntType()),AliasType(IntType())))
 }
+
+func TestFillsMultipleParamsInFuncDef(t *testing.T) {
+    f := ParseFile("TestFillsMultipleParamsInFuncDef", "package main\nfunc f(a, b int, c float) { }")
+    fillTypes(f)
+    var types []interface{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                if ident.Name == "a" || ident.Name == "b" || ident.Name == "c" {
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+    ast.Walk(v, f)
+    AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
+}
+
+func TestFillsAllReturnValuesInFuncDef(t *testing.T) {
+    f := ParseFile("TestFillsAllReturnValuesInFuncDef", "package main\nfunc f() (a, b int, c float) { return 0,0,1.0 }")
+    fillTypes(f)
+    var types []interface{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                if ident.Name == "a" || ident.Name == "b" || ident.Name == "c" {
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+    ast.Walk(v, f)
+    AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
+}

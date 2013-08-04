@@ -179,7 +179,8 @@ func getTypes(n ast.Node) Type {
         }
         return UnknownType("???")
     case *ast.TypeSpec:
-        return AliasedType{t.Name.Name, getTypes(t.Type)}
+        //return AliasType(t.Name.Name, getTypes(t.Type))
+        return AliasType(getTypes(t.Type))
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
@@ -188,6 +189,16 @@ func getTypes(n ast.Node) Type {
 }
 
 type TypeFillingVisitor struct {
+}
+
+func fillFieldList(fs *ast.FieldList) {
+    if fs != nil {
+        for _, l := range fs.List {
+            for _, name := range l.Names {
+                name.Obj.Type = getTypes(l.Type)
+            }
+        }
+    }
 }
 
 // We'll have to hide the first 'case *ast.Ident' within a Return case.
@@ -218,7 +229,8 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
         }
     case *ast.FuncDecl:
         r.Name.Obj.Type = getTypes(r.Type)
-        // Add handling of parameter and results here...
+        fillFieldList(r.Type.Params)
+        fillFieldList(r.Type.Results)
     default:
     }
     return v
