@@ -338,9 +338,10 @@ func TestFillsAllAnonFieldsForStructType(t *testing.T) {
     aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
     eType := AliasType(StructType(map[string]Type{}, []Type{aType}))
     AssertThat(t, types[0], Equals(eType))
+    AssertThat(t, types[1], Equals(eType))
 }
 
-func _TestFillsTypeOfFieldWithinStruct(t *testing.T) {
+func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
     fillTypes(f)
     types := []interface{}{}

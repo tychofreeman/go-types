@@ -179,6 +179,18 @@ func getStructInternals(fields *ast.FieldList) (map[string]Type, []Type) {
     return internals, nil
 }
 
+func getSelectedType(baseType Type, name string) Type {
+    switch baseType := baseType.(type) {
+    case AliasedType:
+        return getSelectedType(baseType.wrapped, name)
+    case StructureType:
+        selected := baseType.internals[name]
+        return selected
+    default:
+        return NoneType{}
+    }
+}
+
 func FuncType(recv *Type, paramList, results []Type) Type {
     return FunctionType{receiver:recv, params:paramList, returns:results}
 }
@@ -300,8 +312,8 @@ func getTypes(n ast.Node) Type {
         return AliasType(getTypes(t.Type))
     case *ast.StructType:
         return StructType(getStructInternals(t.Fields))
-//    case *ast.SelectorExpr:
-//        fmt.Printf("Selecting name %v from type %v\n", t.Sel.Name, getTypes(t.X))
+    case *ast.SelectorExpr:
+        return getSelectedType(getTypes(t.X), t.Sel.Name)
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
