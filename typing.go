@@ -9,6 +9,7 @@ import (
 
 type Type interface {
     String() string
+    Equals(interface{}) (bool,string)
 }
 
 type NoneType struct{}
@@ -25,6 +26,15 @@ func (s SimpleType) String() string {
     return s.name
 }
 
+func (s SimpleType) Equals(other interface{}) (bool,string) {
+    switch other := other.(type) {
+    case SimpleType:
+        return s.name == other.name, fmt.Sprintf("%s != %s", s, other)
+    default:
+        return false, fmt.Sprintf("SimpleType(*) != %T", other)
+    }
+}
+
 type FunctionType struct {
     receiver *Type
     params []Type
@@ -33,6 +43,27 @@ type FunctionType struct {
 
 func (f FunctionType) String() string {
     return "func"
+}
+
+func (f FunctionType) Equals(other interface{}) (bool,string) {
+    switch other := other.(type) {
+    case FunctionType:
+        match := true
+        match = (f.receiver == other.receiver)
+        for i, _ := range f.params {
+            if eq, _ := f.params[i].Equals(other.params[i]); !eq{
+                match = false
+            }
+        }
+        for i, _ := range f.returns {
+            if eq, _ := f.returns[i].Equals(other.returns[i]); !eq {
+                match = false
+            }
+        }
+        return match, fmt.Sprintf("%s != %s", f, other)
+    default:
+        return false, fmt.Sprintf("FunctionType != %T", other)
+    }
 }
     
 
@@ -45,8 +76,22 @@ func (a AliasedType) String() string {
     return "type " + a.name + " " + a.wrapped.String()   
 }
 
+func (a AliasedType) Equals(other interface{}) (bool,string) {
+    switch other := other.(type) {
+    case AliasedType:
+        eq, _ := a.wrapped.Equals(other.wrapped)
+        return a.name == other.name && eq, fmt.Sprintf("%s != %s", a, other)
+    default:
+        return false, fmt.Sprintf("AliasedType != %T", other)
+    }
+}
+
 func UnknownType(data string) Type {
     return NoneType{}
+}
+
+func (n NoneType) Equals(other interface{}) (bool,string) {
+    return false, fmt.Sprintf("NoneType != %T", other)
 }
 
 func StringType() Type {
@@ -83,7 +128,15 @@ type StructureType struct {
 }
 
 func (s StructureType)String() string {
-    return "<struct>"
+    str := "struct { "
+    for _, anon := range s.anons {
+        str += " " + anon.String() + ";"
+    }
+    for name, internal := range s.internals {
+        str += " " + name + " " + internal.String() + ";"
+    }
+    str += "}"
+    return str
 }
 
 func (s StructureType) Equals(other interface{}) (bool, string) {
@@ -101,26 +154,29 @@ func (s StructureType) Equals(other interface{}) (bool, string) {
         }
         return true, ""
     default:
-        return false, "Structure Type cannot be equal to " + reflect.TypeOf(other).Name()
+        return false, fmt.Sprintf("Structure Type != %T", other)
     }
 }
 
-func StructType(fields map[string]Type) Type {
-    return StructureType{fields, []Type{}}
+func StructType(fields map[string]Type, anons []Type) Type {
+    return StructureType{fields, anons}
 }
 
-func getStructInternals(fields *ast.FieldList) map[string]Type {
+func getStructInternals(fields *ast.FieldList) (map[string]Type, []Type) {
     internals := map[string]Type{}
+    anons := []Type{}
     if fields != nil {
         for _, f := range fields.List {
             if len(f.Names) > 0 {
                 for _, name := range f.Names {
                     internals[name.Name] = getTypes(f.Type)
                 }
+            } else {
+                anons = append(anons, getTypes(f.Type))
             }
         }
     }
-    return internals
+    return internals, nil
 }
 
 func FuncType(recv *Type, paramList, results []Type) Type {

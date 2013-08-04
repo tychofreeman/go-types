@@ -293,7 +293,7 @@ func TestFillsIdentForStructType(t *testing.T) {
     }
 
     ast.Walk(v,f)
-    aType := AliasType(StructType(map[string]Type{"B":IntType()}))
+    aType := AliasType(StructType(map[string]Type{"B":IntType()}, nil))
     AssertThat(t, types[0], Equals(aType))
 }
 
@@ -314,8 +314,30 @@ func TestFillsAllIdentsForStructType(t *testing.T) {
     }
 
     ast.Walk(v,f)
-    aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}))
+    aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
     AssertThat(t, types[0], Equals(aType))
+}
+
+func TestFillsAllAnonFieldsForStructType(t *testing.T) {
+    f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\ntype E struct {\nA\n}\n func f(e E) { c := e.B }")
+    fillTypes(f)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "e":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
+    aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
+    eType := AliasType(StructType(map[string]Type{}, []Type{aType}))
+    AssertThat(t, types[0], Equals(eType))
 }
 
 func _TestFillsTypeOfFieldWithinStruct(t *testing.T) {
