@@ -275,3 +275,23 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
     AssertThat(t, params, HasExactly(IntType(),IntType(),FloatType()))
     AssertThat(t, returns,HasExactly(StringType(),StringType(),RuneType()))
 }
+
+func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
+    f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func init() { a := A{0}.B }")
+    fillTypes(f)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "a":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
+    AssertThat(t, types, HasExactly(IntType()))
+}
