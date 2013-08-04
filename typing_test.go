@@ -271,9 +271,7 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
         returns = append(returns, p)
     }
 
-    if types[0].receiver != nil {
-        t.Errorf("Expected a nil receiver, but got %v\n", types[0].receiver)
-    }
+    AssertThat(t, types[0].receiver, Equals(nil))
     AssertThat(t, params, HasExactly(IntType(),IntType(),FloatType()))
     AssertThat(t, returns,HasExactly(StringType(),StringType(),RuneType()))
 }
