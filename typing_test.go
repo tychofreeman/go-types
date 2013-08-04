@@ -260,7 +260,8 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
         },
     }
     ast.Walk(v, f)
-    AssertThat(t, types[0].receiver, Equals(nil))
+
+    // Copy to interface{} slices...
     params := []interface{}{}
     for _, p := range types[0].params {
         params = append(params, p)
@@ -268,6 +269,10 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
     returns := []interface{}{}
     for _, p := range types[0].returns {
         returns = append(returns, p)
+    }
+
+    if types[0].receiver != nil {
+        t.Errorf("Expected a nil receiver, but got %v\n", types[0].receiver)
     }
     AssertThat(t, params, HasExactly(IntType(),IntType(),FloatType()))
     AssertThat(t, returns,HasExactly(StringType(),StringType(),RuneType()))

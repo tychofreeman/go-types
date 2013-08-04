@@ -84,21 +84,21 @@ func FuncType(recv *Type, paramList, results []Type) Type {
 func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
     
     paramList := []Type{}
+    for _, param := range params {
+        for _, paramIdent := range param.Names {
+            paramList = append(paramList, getTypes(paramIdent))
+        }
+    }
+
     rtnList := []Type{}
-    var firstRtnType Type = nil
-    if len(results) == 0 {
-        return NoneType{}
-    }
-    if len(results[0].Names) > 0 {
-        firstRtnType = getTypes(results[0].Names[0])
-    }
-    switch firstRtnType.(type) {
-    case NoneType:
-        rtnList = append(rtnList, getTypes(results[0].Type))
-    case nil:
-        rtnList = append(rtnList, getTypes(results[0].Type))
-    default:
-        rtnList = append(rtnList, firstRtnType)
+    for _, result := range results {
+        if len(result.Names) == 0 {
+            rtnList = append(rtnList, getTypes(result.Type))
+        } else {
+            for _, resultIdent := range result.Names {
+                rtnList = append(rtnList, getTypes(resultIdent))
+            }
+        }
     }
 
     return FunctionType{receiver:nil, params:paramList, returns:rtnList}
@@ -147,6 +147,9 @@ func getTypes(n ast.Node) Type {
         params := []*ast.Field{}
         if t.Results != nil {
             results = t.Results.List
+        }
+        if t.Params != nil {
+            params = t.Params.List
         }
         return funcType(nil, params, results)
     case *ast.Ident:
