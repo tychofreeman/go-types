@@ -381,4 +381,7 @@ func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
     AssertThat(t, types, HasExactly(IntType()))
 }
 
+// Next, add selection of methods...
+
 // Next, add one for namespaces
+
