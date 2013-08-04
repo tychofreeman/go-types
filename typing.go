@@ -77,9 +77,56 @@ func AliasType(aliased Type) Type {
     return AliasedType{"", aliased}
 }
 
+type StructureType struct {
+    internals map[string]Type
+    anons []Type
+}
+
+func (s StructureType)String() string {
+    return "<struct>"
+}
+
+func (s StructureType) Equals(other interface{}) (bool, string) {
+    switch other := other.(type) {
+    case StructureType:
+        for k,_ := range s.internals {
+            if v, ok := other.internals[k]; !ok {
+                return false, fmt.Sprintf("missing internal type named %s with type %s", k, v)
+            }
+        }
+        for k,_ := range other.internals {
+            if v, ok := s.internals[k]; !ok {
+                return false, fmt.Sprintf("missing internal type named %s with type %s", k, v)
+            }
+        }
+        return true, ""
+    default:
+        return false, "Structure Type cannot be equal to " + reflect.TypeOf(other).Name()
+    }
+}
+
+func StructType(fields map[string]Type) Type {
+    return StructureType{fields, []Type{}}
+}
+
+func getStructInternals(fields *ast.FieldList) map[string]Type {
+    internals := map[string]Type{}
+    if fields != nil {
+        for _, f := range fields.List {
+            if len(f.Names) > 0 {
+                for _, name := range f.Names {
+                    internals[name.Name] = getTypes(f.Type)
+                }
+            }
+        }
+    }
+    return internals
+}
+
 func FuncType(recv *Type, paramList, results []Type) Type {
     return FunctionType{receiver:recv, params:paramList, returns:results}
 }
+
 
 // Create a FunctionType from the information found in the AST.
 func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
@@ -195,6 +242,10 @@ func getTypes(n ast.Node) Type {
     case *ast.TypeSpec:
         //return AliasType(t.Name.Name, getTypes(t.Type))
         return AliasType(getTypes(t.Type))
+    case *ast.StructType:
+        return StructType(getStructInternals(t.Fields))
+//    case *ast.SelectorExpr:
+//        fmt.Printf("Selecting name %v from type %v\n", t.Sel.Name, getTypes(t.X))
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }

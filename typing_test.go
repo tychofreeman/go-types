@@ -276,8 +276,8 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
     AssertThat(t, returns,HasExactly(StringType(),StringType(),RuneType()))
 }
 
-func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
-    f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func init() { a := A{0}.B }")
+func TestFillsIdentForStructType(t *testing.T) {
+    f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
     fillTypes(f)
     types := []interface{}{}
     v := FuncVisitor{
@@ -293,5 +293,49 @@ func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
     }
 
     ast.Walk(v,f)
+    aType := AliasType(StructType(map[string]Type{"B":IntType()}))
+    AssertThat(t, types[0], Equals(aType))
+}
+
+func TestFillsAllIdentsForStructType(t *testing.T) {
+    f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\n func f(a A) { c := a.B }")
+    fillTypes(f)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "a":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
+    aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}))
+    AssertThat(t, types[0], Equals(aType))
+}
+
+func _TestFillsTypeOfFieldWithinStruct(t *testing.T) {
+    f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
+    fillTypes(f)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "c":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
     AssertThat(t, types, HasExactly(IntType()))
 }
+
+// Next, add one for namespaces
