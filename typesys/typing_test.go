@@ -184,195 +184,73 @@ func TestFillsVarWithTypeAlias(t *testing.T) {
 func TestFillsMultipleParamsInFuncDef(t *testing.T) {
     f := ParseFile("TestFillsMultipleParamsInFuncDef", "package main\nfunc f(a, b int, c float) { }")
     fillTypes(f, nil)
-    var types []interface{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                if ident.Name == "a" || ident.Name == "b" || ident.Name == "c" {
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
-    ast.Walk(v, f)
+    types := getTypesForIds(f, "a","b","c")
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
 }
 
 func TestFillsAllReturnValuesInFuncDef(t *testing.T) {
     f := ParseFile("TestFillsAllReturnValuesInFuncDef", "package main\nfunc f() (a, b int, c float) { return 0,0,1.0 }")
     fillTypes(f, nil)
-    var types []interface{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                if ident.Name == "a" || ident.Name == "b" || ident.Name == "c" {
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
-    ast.Walk(v, f)
+    types := getTypesForIds(f, "a","b","c")
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
 }
 
 func TestFillsAllReturnAndParamTypesInFuncLiteral(t *testing.T) {
     f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc init() { fn := func(a,b int, c float) (d,e string, f rune) { return } }")
     fillTypes(f, nil)
-    var types []interface{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "a", "b", "c", "d", "e", "f":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
-    ast.Walk(v, f)
+    types := getTypesForIds(f, "a", "b", "c", "d", "e", "f")
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType(),StringType(),StringType(),RuneType()))
 }
 
 func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
     f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc fn(a,b int, c float) (d,e string, f rune) { return }")
     fillTypes(f, nil)
-    types := []FunctionType{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "fn":
-                    switch funcType := ident.Obj.Type.(type) {
-                    case FunctionType:
-                        types = append(types, funcType)
-                    }
-                }
-            }
-        },
-    }
-    ast.Walk(v, f)
+    types := getTypesForIds(f, "fn")
 
-    // Copy to interface{} slices...
-    params := []interface{}{}
-    for _, p := range types[0].params {
-        params = append(params, p)
-    }
-    returns := []interface{}{}
-    for _, p := range types[0].returns {
-        returns = append(returns, p)
-    }
-
-    AssertThat(t, types[0].receiver, Equals(nil))
-    AssertThat(t, params, HasExactly(IntType(),IntType(),FloatType()))
-    AssertThat(t, returns,HasExactly(StringType(),StringType(),RuneType()))
+    AssertThat(t, types, HasExactly(FunctionType{nil, []Type{IntType(),IntType(),FloatType()}, []Type{StringType(),StringType(),RuneType()}}))
 }
 
 func TestFillsIdentForStructType(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
     fillTypes(f, nil)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "a":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "a")
 
-    ast.Walk(v,f)
     aType := AliasType(StructType(map[string]Type{"B":IntType()}, nil))
-    AssertThat(t, types[0], Equals(aType))
+    AssertThat(t, types, HasExactly(aType, aType))
 }
 
 func TestFillsAllIdentsForStructType(t *testing.T) {
     f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\n func f(a A) { c := a.B }")
     fillTypes(f, nil)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "a":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "a")
 
-    ast.Walk(v,f)
     aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
-    AssertThat(t, types[0], Equals(aType))
+    AssertThat(t, types, HasExactly(aType, aType))
 }
 
 func TestFillsAllAnonFieldsForStructType(t *testing.T) {
     f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\ntype E struct {\nA\n}\n func f(e E) { c := e.B }")
     fillTypes(f, nil)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "e":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "e")
 
-    ast.Walk(v,f)
     aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
     eType := AliasType(StructType(map[string]Type{}, []Type{aType}))
-    AssertThat(t, types[0], Equals(eType))
-    AssertThat(t, types[1], Equals(eType))
+    AssertThat(t, types, HasExactly(eType, eType))
 }
 
 func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
     fillTypes(f, nil)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "c":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "c")
 
-    ast.Walk(v,f)
     AssertThat(t, types, HasExactly(IntType()))
 }
 
 func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct", "package main\ntype A struct {\nB int\n}\ntype D struct {\nA\n}\n func f(a D) { c := a.B }")
     fillTypes(f, nil)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "c":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "c")
 
-    ast.Walk(v,f)
     AssertThat(t, types, HasExactly(IntType()))
 }
 
@@ -380,20 +258,8 @@ func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
 func TestFillsTypeForMethod(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\ntype A int\nfunc (a A) Inc() A { return A(a + 1) }\nfunc f(a A) { b := a.Inc }")
     fillTypes(f, nil)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "b":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "b")
 
-    ast.Walk(v,f)
     intAlias := AliasedType{"", IntType(), map[string]FunctionType{}}
     var aliasPtr Type = intAlias
     expected := FunctionType{&aliasPtr, []Type{}, []Type{intAlias}}
