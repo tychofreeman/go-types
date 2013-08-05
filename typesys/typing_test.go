@@ -406,7 +406,6 @@ func TestFillsTypeForMethod(t *testing.T) {
     AssertThat(t, types, HasExactly(expected))
 }
 
-// Next, add one for namespaces
 func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\nimport \"mypkg\"\nfunc init() { b := mypkg.ReturnsInt() }")
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
@@ -428,3 +427,5 @@ func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
     AssertThat(t, types, HasExactly(IntType()))
 }
 
+// Need to handle package aliases, and the corner case of ".". That'll be tricky.
+// Also, currently I can't have a package name and a variable name conflict. Is that ok?
