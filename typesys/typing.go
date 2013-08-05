@@ -42,22 +42,34 @@ type FunctionType struct {
 }
 
 func (f FunctionType) String() string {
-    return "func"
+    return fmt.Sprintf("func (%v) (%v) (%v)", *f.receiver, f.params, f.returns)
 }
 
 func (f FunctionType) Equals(other interface{}) (bool,string) {
     switch other := other.(type) {
     case FunctionType:
         match := true
-        match = (f.receiver == other.receiver)
-        for i, _ := range f.params {
-            if eq, _ := f.params[i].Equals(other.params[i]); !eq{
-                match = false
+        if f.receiver != nil && other.receiver != nil {
+            match, _ = ((*f.receiver).Equals(*other.receiver))
+        } else {
+            match = (f.receiver == other.receiver)
+        }
+        if len(f.params) != len(other.params) {
+            match = false
+        } else {
+            for i, _ := range f.params {
+                if eq, _ := f.params[i].Equals(other.params[i]); !eq{
+                    match = false
+                }
             }
         }
-        for i, _ := range f.returns {
-            if eq, _ := f.returns[i].Equals(other.returns[i]); !eq {
-                match = false
+        if len(f.returns) != len(other.returns) {
+            match = false
+        } else {
+            for i, _ := range f.returns {
+                if eq, _ := f.returns[i].Equals(other.returns[i]); !eq {
+                    match = false
+                }
             }
         }
         return match, fmt.Sprintf("%s != %s", f, other)
@@ -70,14 +82,25 @@ func (f FunctionType) Equals(other interface{}) (bool,string) {
 type AliasedType struct {
     name string
     wrapped Type
+    methods map[string]FunctionType
+}
+
+func (a AliasedType) AddMethod(name string, t FunctionType) {
+    a.methods[name] = t
 }
 
 func (a AliasedType) String() string {
-    return "type " + a.name + " " + a.wrapped.String()   
+    out := "type " + a.name + " " + a.wrapped.String() + "\n"
+    for k, _ := range a.methods {
+        out += "\t func " + k + "\n"
+    }
+    return out
 }
 
 func (a AliasedType) Equals(other interface{}) (bool,string) {
     switch other := other.(type) {
+    case *AliasedType:
+        return a.Equals(*other)
     case AliasedType:
         eq, _ := a.wrapped.Equals(other.wrapped)
         return a.name == other.name && eq, fmt.Sprintf("%s != %s", a, other)
@@ -119,7 +142,7 @@ func ComplexType() Type {
 }
 
 func AliasType(aliased Type) Type {
-    return AliasedType{"", aliased}
+    return &AliasedType{"", aliased, map[string]FunctionType{}}
 }
 
 type StructureType struct {
@@ -181,7 +204,10 @@ func getStructInternals(fields *ast.FieldList) (map[string]Type, []Type) {
 
 func getSelectedType(baseType Type, name string) (Type,bool) {
     switch baseType := baseType.(type) {
-    case AliasedType:
+    case *AliasedType:
+        if m, ok := baseType.methods[name]; ok {
+            return m, ok
+        }
         return getSelectedType(baseType.wrapped, name)
     case StructureType:
         selected, ok := baseType.internals[name]
@@ -199,8 +225,13 @@ func getSelectedType(baseType Type, name string) (Type,bool) {
     }
 }
 
-func FuncType(recv *Type, paramList, results []Type) Type {
-    return FunctionType{receiver:recv, params:paramList, returns:results}
+func FuncType(recv Type, paramList, results []Type) Type {
+    recvPtr := &recv
+    switch recv.(type) {
+    case NoneType:
+        recvPtr = nil
+    }
+    return FunctionType{receiver:recvPtr, params:paramList, returns:results}
 }
 
 
@@ -224,7 +255,14 @@ func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
         }
     }
 
-    return FunctionType{receiver:nil, params:paramList, returns:rtnList}
+    var recvType *Type
+    if recv != nil && len(recv.List) > 0 {
+        rc := getTypes(recv.List[0].Names[0])
+        recvType = &rc
+    }
+
+
+    return FunctionType{receiver:recvType, params:paramList, returns:rtnList}
 }
 
 func getTypes(n ast.Node) Type {
@@ -264,7 +302,16 @@ func getTypes(n ast.Node) Type {
         }
         return UnknownType("Wierd Call expression")
     case *ast.FuncDecl:
-        return funcType(nil, nil, t.Type.Results.List)
+        results := []*ast.Field{}
+        params := []*ast.Field{}
+        if t.Type.Results != nil {
+            results = t.Type.Results.List
+        }
+        if t.Type.Params != nil {
+            params = t.Type.Params.List
+        }
+        ft := funcType(t.Recv, params, results)
+        return ft
     case *ast.FuncType:
         results := []*ast.Field{}
         params := []*ast.Field{}
@@ -327,7 +374,7 @@ func getTypes(n ast.Node) Type {
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
-    fmt.Printf("Returning 'UNKNOWN'\n")
+    fmt.Printf("Returning 'UNKNOWN' for type %T\n", n)
     return UnknownType("UNKNOWN")
 }
 
@@ -372,11 +419,29 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
                 t.Obj.Type = getTypes(r.Rhs[0])
             }
         }
+    case *ast.TypeSpec:
+        if r.Name != nil {
+            r.Name.Obj.Type = getTypes(r)
+        }
     case *ast.FuncDecl:
         fillFieldList(r.Type.Params)
         fillFieldList(r.Type.Results)
+        var fnType FunctionType
+        switch t := getTypes(r).(type) {
+        case FunctionType:
+            fnType = t
+        }
         if r.Name != nil && r.Name.Obj != nil {
-            r.Name.Obj.Type = getTypes(r.Type)
+            r.Name.Obj.Type = fnType
+        }
+        if r.Recv != nil {
+            switch recvDecl := r.Recv.List[0].Type.(type) {
+            case *ast.Ident:
+                switch recv := recvDecl.Obj.Type.(type) {
+                case *AliasedType:
+                    recv.AddMethod(r.Name.Name, fnType)
+                }
+            }
         }
     case *ast.FuncLit:
         fillFieldList(r.Type.Params)

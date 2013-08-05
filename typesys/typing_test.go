@@ -382,6 +382,29 @@ func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
 }
 
 // Next, add selection of methods...
+func TestFillsTypeForMethod(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMethod", "package main\ntype A int\nfunc (a A) Inc() A { return A(a + 1) }\nfunc f(a A) { b := a.Inc }")
+    fillTypes(f)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "b":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
+    intAlias := AliasedType{"", IntType(), map[string]FunctionType{}}
+    var aliasPtr Type = intAlias
+    expected := FunctionType{&aliasPtr, []Type{}, []Type{intAlias}}
+    intAlias.AddMethod("Inc", expected)
+    AssertThat(t, types, HasExactly(expected))
+}
 
 // Next, add one for namespaces
 
