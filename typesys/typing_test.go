@@ -84,6 +84,24 @@ func ParseFile(filename, contents string) *ast.File {
     return f
 }
 
+func getTypesForIds(f *ast.File, ids ...string) (interface{}) {
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                for _, id := range ids {
+                    if ident.Name == id {
+                        types = append(types, ident.Obj.Type)
+                    }
+                }
+            }
+        },
+    }
+    ast.Walk(v,f)
+    return types
+}
+
 func TestFillsTypeOfVarInAssignment(t *testing.T) {
     f := ParseFile("TestFillsTypeOfVarInAssignment", "package main\nvar z func(int)int = func (a int) int { b := a + 2; return b }")
     visitor := FuncVisitor{
@@ -152,37 +170,14 @@ func TestFillsTypeOfFuncName(t *testing.T) {
 func TestFillsVarAssignedToCallOfFunc(t *testing.T) {
     f := ParseFile("TestFillsVarAssignedToCallOfFunc", "package main\nfunc f(a int) int { return a * 2 }\nfunc g() {b := f(3)}")
     fillTypes(f, nil)
-    bWasFound := false
-    v := FuncVisitor {
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                if ident.Name == "b" {
-                    bWasFound = true
-                    AssertThat(t, ident.Obj.Type, Equals(IntType()))
-                }
-            }
-        },
-    }
-    ast.Walk(v, f)
-    AssertThat(t, bWasFound, IsTrue)
+    types := getTypesForIds(f, "b")
+    AssertThat(t, types, HasExactly(IntType()))
 }
 
 func TestFillsVarWithTypeAlias(t *testing.T) {
     f := ParseFile("TestFillsvarWithTypeAlias", "package main\ntype A int\nfunc f(a A) { b := A(a) }")
     fillTypes(f, nil)
-    var types []interface{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                if ident.Name == "a" {
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
-    ast.Walk(v, f)
+    types := getTypesForIds(f, "a")
     AssertThat(t, types, HasExactly(AliasType(IntType()),AliasType(IntType())))
 }
 
@@ -410,20 +405,8 @@ func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\nimport \"mypkg\"\nfunc init() { b := mypkg.ReturnsInt() }")
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
     fillTypes(f, pkg)
-    types := []interface{}{}
-    v := FuncVisitor{
-        func(n ast.Node) {
-            switch ident := n.(type) {
-            case *ast.Ident:
-                switch ident.Name {
-                case "b":
-                    types = append(types, ident.Obj.Type)
-                }
-            }
-        },
-    }
+    types := getTypesForIds(f, "b")
 
-    ast.Walk(v,f)
     AssertThat(t, types, HasExactly(IntType()))
 }
 
