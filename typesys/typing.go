@@ -5,6 +5,7 @@ import (
     "reflect"
     "go/ast"
     "go/token"
+    "strings"
 )
 
 type Type interface {
@@ -234,20 +235,20 @@ func (v TypeFillingVisitor) getStructInternals(fields *ast.FieldList) (map[strin
     return internals, anons
 }
 
-func getSelectedType(baseType Type, name string) (Type,bool) {
+func (v TypeFillingVisitor) getSelectedType(baseType Type, name string) (Type,bool) {
     switch baseType := baseType.(type) {
     case *AliasedType:
         if m, ok := baseType.methods[name]; ok {
             return m, ok
         }
-        return getSelectedType(baseType.wrapped, name)
+        return v.getSelectedType(baseType.wrapped, name)
     case StructureType:
         selected, ok := baseType.internals[name]
         if ok {
             return selected, ok
         }
         for _, anon := range baseType.anons {
-            if sub, ok := getSelectedType(anon, name); ok {
+            if sub, ok := v.getSelectedType(anon, name); ok {
                 return sub, ok
             }
         }
@@ -372,7 +373,11 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
             case "rune":
                 return RuneType()
             default:
-                if pkg, ok := v.pkg[t.Name]; ok {
+                pkgName := t.Name
+                if alias, ok := v.aliases[pkgName]; ok {
+                    pkgName = alias
+                }
+                if pkg, ok := v.pkg[pkgName]; ok {
                     return pkg
                 }
                 return UnknownType("TYPE IDENT " + t.Name)
@@ -407,7 +412,7 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
     case *ast.StructType:
         return StructType(v.getStructInternals(t.Fields))
     case *ast.SelectorExpr:
-        if rtn, ok := getSelectedType(v.getTypes(t.X), t.Sel.Name); ok {
+        if rtn, ok := v.getSelectedType(v.getTypes(t.X), t.Sel.Name); ok {
             return rtn
         }
     default:
@@ -419,6 +424,7 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
 
 type TypeFillingVisitor struct {
     pkg map[string]PackageType
+    aliases map[string]string
 }
 
 func (v TypeFillingVisitor) fillFieldList(fs *ast.FieldList) {
@@ -461,6 +467,10 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
         if r.Name != nil {
             r.Name.Obj.Type = v.getTypes(r)
         }
+    case *ast.ImportSpec:
+        if v.aliases != nil && r.Name != nil {
+            v.aliases[r.Name.Name] = strings.Trim(r.Path.Value, "\"")
+        }
     case *ast.FuncDecl:
         v.fillFieldList(r.Type.Params)
         v.fillFieldList(r.Type.Results)
@@ -490,7 +500,7 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
 }
 
 func fillTypes(n ast.Node, pkg map[string]PackageType) {
-    v := TypeFillingVisitor{pkg:pkg}
+    v := TypeFillingVisitor{pkg:pkg, aliases:map[string]string{}}
     ast.Walk(v, n) 
 }
 

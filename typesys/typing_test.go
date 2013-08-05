@@ -10,7 +10,7 @@ import (
 
 func getTypeOfExpr(expr string) Type {
     i, _ := parser.ParseExpr(expr)
-    return TypeFillingVisitor{nil}.getTypes(i)
+    return TypeFillingVisitor{nil,nil}.getTypes(i)
 }
 
 func TestFindsTypeOfStringExpression(t *testing.T) {
@@ -269,6 +269,15 @@ func TestFillsTypeForMethod(t *testing.T) {
 
 func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\nimport \"mypkg\"\nfunc init() { b := mypkg.ReturnsInt() }")
+    pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
+    fillTypes(f, pkg)
+    types := getTypesForIds(f, "b")
+
+    AssertThat(t, types, HasExactly(IntType()))
+}
+
+func TestFillsTypeForMethodInAliasedPackage(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport mp \"mypkg\"\nfunc init() { b := mp.ReturnsInt() }")
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
     fillTypes(f, pkg)
     types := getTypesForIds(f, "b")
