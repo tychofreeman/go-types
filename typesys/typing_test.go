@@ -10,7 +10,7 @@ import (
 
 func getTypeOfExpr(expr string) Type {
     i, _ := parser.ParseExpr(expr)
-    return getTypes(i)
+    return TypeFillingVisitor{nil}.getTypes(i)
 }
 
 func TestFindsTypeOfStringExpression(t *testing.T) {
@@ -53,7 +53,7 @@ func TestFillsTypeOfExpression(t *testing.T) {
             switch i3 := rtn2.Results[0].(type) {
             case *ast.Ident:
                 AssertThat(t, i3.Obj.Type, Equals(nil))
-                fillTypes(i)
+                fillTypes(i, nil)
                 AssertThat(t, i3.Obj.Type, Equals(IntType()))
             default:
                 t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
@@ -97,7 +97,7 @@ func TestFillsTypeOfVarInAssignment(t *testing.T) {
                     switch i3 := rtn2.Lhs[0].(type) {
                     case *ast.Ident:
                         AssertThat(t, i3.Obj.Type, Equals(nil))
-                        fillTypes(n)
+                        fillTypes(n, nil)
                         AssertThat(t, i3.Obj.Type, Equals(IntType()))
                     default:
                         t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
@@ -120,7 +120,7 @@ func _TestFillsTypeOfVarAssignedToCast(t *testing.T) {
                 switch lhs := assign.Lhs[0].(type) {
                     case *ast.Ident:
                         AssertThat(t, lhs.Obj.Type, Equals(nil))
-                        fillTypes(n)
+                        fillTypes(n, nil)
                         AssertThat(t, lhs.Obj.Type, Equals(FloatType()))
                 }
             }
@@ -131,7 +131,7 @@ func _TestFillsTypeOfVarAssignedToCast(t *testing.T) {
 
 func TestFillsTypeOfFuncName(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFuncName", "package main\nfunc f(a int) float { return float(a) }")
-    fillTypes(f)
+    fillTypes(f, nil)
     v := FuncVisitor{
         func(n ast.Node) {
             switch ident := n.(type) {
@@ -151,7 +151,7 @@ func TestFillsTypeOfFuncName(t *testing.T) {
 
 func TestFillsVarAssignedToCallOfFunc(t *testing.T) {
     f := ParseFile("TestFillsVarAssignedToCallOfFunc", "package main\nfunc f(a int) int { return a * 2 }\nfunc g() {b := f(3)}")
-    fillTypes(f)
+    fillTypes(f, nil)
     bWasFound := false
     v := FuncVisitor {
         func(n ast.Node) {
@@ -170,7 +170,7 @@ func TestFillsVarAssignedToCallOfFunc(t *testing.T) {
 
 func TestFillsVarWithTypeAlias(t *testing.T) {
     f := ParseFile("TestFillsvarWithTypeAlias", "package main\ntype A int\nfunc f(a A) { b := A(a) }")
-    fillTypes(f)
+    fillTypes(f, nil)
     var types []interface{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -188,7 +188,7 @@ func TestFillsVarWithTypeAlias(t *testing.T) {
 
 func TestFillsMultipleParamsInFuncDef(t *testing.T) {
     f := ParseFile("TestFillsMultipleParamsInFuncDef", "package main\nfunc f(a, b int, c float) { }")
-    fillTypes(f)
+    fillTypes(f, nil)
     var types []interface{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -206,7 +206,7 @@ func TestFillsMultipleParamsInFuncDef(t *testing.T) {
 
 func TestFillsAllReturnValuesInFuncDef(t *testing.T) {
     f := ParseFile("TestFillsAllReturnValuesInFuncDef", "package main\nfunc f() (a, b int, c float) { return 0,0,1.0 }")
-    fillTypes(f)
+    fillTypes(f, nil)
     var types []interface{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -224,7 +224,7 @@ func TestFillsAllReturnValuesInFuncDef(t *testing.T) {
 
 func TestFillsAllReturnAndParamTypesInFuncLiteral(t *testing.T) {
     f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc init() { fn := func(a,b int, c float) (d,e string, f rune) { return } }")
-    fillTypes(f)
+    fillTypes(f, nil)
     var types []interface{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -243,7 +243,7 @@ func TestFillsAllReturnAndParamTypesInFuncLiteral(t *testing.T) {
 
 func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
     f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc fn(a,b int, c float) (d,e string, f rune) { return }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []FunctionType{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -278,7 +278,7 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
 
 func TestFillsIdentForStructType(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []interface{}{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -299,7 +299,7 @@ func TestFillsIdentForStructType(t *testing.T) {
 
 func TestFillsAllIdentsForStructType(t *testing.T) {
     f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\n func f(a A) { c := a.B }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []interface{}{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -320,7 +320,7 @@ func TestFillsAllIdentsForStructType(t *testing.T) {
 
 func TestFillsAllAnonFieldsForStructType(t *testing.T) {
     f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\ntype E struct {\nA\n}\n func f(e E) { c := e.B }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []interface{}{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -343,7 +343,7 @@ func TestFillsAllAnonFieldsForStructType(t *testing.T) {
 
 func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []interface{}{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -363,7 +363,7 @@ func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
 
 func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct", "package main\ntype A struct {\nB int\n}\ntype D struct {\nA\n}\n func f(a D) { c := a.B }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []interface{}{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -384,7 +384,7 @@ func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
 // Next, add selection of methods...
 func TestFillsTypeForMethod(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\ntype A int\nfunc (a A) Inc() A { return A(a + 1) }\nfunc f(a A) { b := a.Inc }")
-    fillTypes(f)
+    fillTypes(f, nil)
     types := []interface{}{}
     v := FuncVisitor{
         func(n ast.Node) {
@@ -407,4 +407,24 @@ func TestFillsTypeForMethod(t *testing.T) {
 }
 
 // Next, add one for namespaces
+func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMethod", "package main\nimport \"mypkg\"\nfunc init() { b := mypkg.ReturnsInt() }")
+    pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
+    fillTypes(f, pkg)
+    types := []interface{}{}
+    v := FuncVisitor{
+        func(n ast.Node) {
+            switch ident := n.(type) {
+            case *ast.Ident:
+                switch ident.Name {
+                case "b":
+                    types = append(types, ident.Obj.Type)
+                }
+            }
+        },
+    }
+
+    ast.Walk(v,f)
+    AssertThat(t, types, HasExactly(IntType()))
+}
 

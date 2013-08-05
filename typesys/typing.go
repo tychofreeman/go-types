@@ -35,6 +35,35 @@ func (s SimpleType) Equals(other interface{}) (bool,string) {
     }
 }
 
+type PackageType struct {
+    fns map[string]FunctionType
+}
+
+func (p PackageType) String() string {
+    return "pkg"
+}
+
+func (p PackageType) Equals(other interface{}) (bool,string) {
+    match := true
+    msg := ""
+    switch other := other.(type) {
+    case PackageType:
+        for k,f := range p.fns {
+            if otherF, ok := other.fns[k]; !ok {
+                match = false
+                msg = fmt.Sprintf("Function %s is not found", k)
+            } else if ok2, _ := f.Equals(otherF); !ok2 {
+                match = false
+                msg = fmt.Sprintf("Function %s does not match: %v vs %v", k, f, otherF)
+            }
+        }
+    default:
+        match = false
+        msg = fmt.Sprintf("PakageType != %T", other)
+    }
+    return match, msg
+}
+
 type FunctionType struct {
     receiver *Type
     params []Type
@@ -42,7 +71,10 @@ type FunctionType struct {
 }
 
 func (f FunctionType) String() string {
-    return fmt.Sprintf("func (%v) (%v) (%v)", *f.receiver, f.params, f.returns)
+    if f.receiver != nil  {
+        return fmt.Sprintf("func (%v) (%v) (%v)", *f.receiver, f.params, f.returns)
+    }
+    return fmt.Sprintf("func  (%v) (%v)", f.params, f.returns)
 }
 
 func (f FunctionType) Equals(other interface{}) (bool,string) {
@@ -185,17 +217,17 @@ func StructType(fields map[string]Type, anons []Type) Type {
     return StructureType{fields, anons}
 }
 
-func getStructInternals(fields *ast.FieldList) (map[string]Type, []Type) {
+func (v TypeFillingVisitor) getStructInternals(fields *ast.FieldList) (map[string]Type, []Type) {
     internals := map[string]Type{}
     anons := []Type{}
     if fields != nil {
         for _, f := range fields.List {
             if len(f.Names) > 0 {
                 for _, name := range f.Names {
-                    internals[name.Name] = getTypes(f.Type)
+                    internals[name.Name] = v.getTypes(f.Type)
                 }
             } else {
-                anons = append(anons, getTypes(f.Type))
+                anons = append(anons, v.getTypes(f.Type))
             }
         }
     }
@@ -220,7 +252,11 @@ func getSelectedType(baseType Type, name string) (Type,bool) {
             }
         }
         return NoneType{}, false
+    case PackageType:
+        item, ok := baseType.fns[name]
+        return item, ok
     default:
+        fmt.Printf("could not get selected type of %v - %T\n", baseType, baseType)
         return NoneType{}, false
     }
 }
@@ -236,28 +272,28 @@ func FuncType(recv Type, paramList, results []Type) Type {
 
 
 // Create a FunctionType from the information found in the AST.
-func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
+func (v TypeFillingVisitor) funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
     paramList := []Type{}
     for _, param := range params {
         for _, paramIdent := range param.Names {
-            paramList = append(paramList, getTypes(paramIdent))
+            paramList = append(paramList, v.getTypes(paramIdent))
         }
     }
 
     rtnList := []Type{}
     for _, result := range results {
         if len(result.Names) == 0 {
-            rtnList = append(rtnList, getTypes(result.Type))
+            rtnList = append(rtnList, v.getTypes(result.Type))
         } else {
             for _, resultIdent := range result.Names {
-                rtnList = append(rtnList, getTypes(resultIdent))
+                rtnList = append(rtnList, v.getTypes(resultIdent))
             }
         }
     }
 
     var recvType *Type
     if recv != nil && len(recv.List) > 0 {
-        rc := getTypes(recv.List[0].Names[0])
+        rc := v.getTypes(recv.List[0].Names[0])
         recvType = &rc
     }
 
@@ -265,7 +301,7 @@ func funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
     return FunctionType{receiver:recvType, params:paramList, returns:rtnList}
 }
 
-func getTypes(n ast.Node) Type {
+func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
     switch t := n.(type) {
     case *ast.BasicLit:
         switch t.Kind {
@@ -283,15 +319,15 @@ func getTypes(n ast.Node) Type {
             fmt.Printf("Unhandled BasicLit: %v\n", reflect.TypeOf(t.Kind))
         }
     case *ast.BinaryExpr:
-        xType := getTypes(t.X)
-        yType := getTypes(t.Y)
+        xType := v.getTypes(t.X)
+        yType := v.getTypes(t.Y)
         if xType == yType {
             return xType
         } else {
             fmt.Printf("Unhandled BinaryExpr: %v vs %v\n", xType, yType)
         }
     case *ast.CallExpr:
-        fnType := getTypes(t.Fun)
+        fnType := v.getTypes(t.Fun)
         switch fnType := fnType.(type) {
         case FunctionType:
             if len(fnType.returns) > 0 {
@@ -310,7 +346,7 @@ func getTypes(n ast.Node) Type {
         if t.Type.Params != nil {
             params = t.Type.Params.List
         }
-        ft := funcType(t.Recv, params, results)
+        ft := v.funcType(t.Recv, params, results)
         return ft
     case *ast.FuncType:
         results := []*ast.Field{}
@@ -321,7 +357,7 @@ func getTypes(n ast.Node) Type {
         if t.Params != nil {
             params = t.Params.List
         }
-        return funcType(nil, params, results)
+        return v.funcType(nil, params, results)
     case *ast.Ident:
         if t.Obj == nil {
             switch t.Name {
@@ -336,6 +372,9 @@ func getTypes(n ast.Node) Type {
             case "rune":
                 return RuneType()
             default:
+                if pkg, ok := v.pkg[t.Name]; ok {
+                    return pkg
+                }
                 return UnknownType("TYPE IDENT " + t.Name)
             }
         }
@@ -349,7 +388,7 @@ func getTypes(n ast.Node) Type {
         }
         switch de := t.Obj.Decl.(type) {
         case ast.Node:
-            return getTypes(de)
+            return v.getTypes(de)
         default:
             fmt.Printf("Unhandled Ident.Obj.Decl: %v (data: %v)\n", reflect.TypeOf(t.Obj.Decl), reflect.TypeOf(t.Obj.Data))
         }
@@ -357,18 +396,18 @@ func getTypes(n ast.Node) Type {
     case *ast.Field:
         switch tt := t.Type.(type) {
         case *ast.Ident:
-            return getTypes(tt)
+            return v.getTypes(tt)
         default:
             fmt.Printf("Unhandled Field: %v\n", reflect.TypeOf(tt))
         }
         return UnknownType("???")
     case *ast.TypeSpec:
-        //return AliasType(t.Name.Name, getTypes(t.Type))
-        return AliasType(getTypes(t.Type))
+        //return AliasType(t.Name.Name, v.getTypes(t.Type))
+        return AliasType(v.getTypes(t.Type))
     case *ast.StructType:
-        return StructType(getStructInternals(t.Fields))
+        return StructType(v.getStructInternals(t.Fields))
     case *ast.SelectorExpr:
-        if rtn, ok := getSelectedType(getTypes(t.X), t.Sel.Name); ok {
+        if rtn, ok := getSelectedType(v.getTypes(t.X), t.Sel.Name); ok {
             return rtn
         }
     default:
@@ -379,20 +418,19 @@ func getTypes(n ast.Node) Type {
 }
 
 type TypeFillingVisitor struct {
+    pkg map[string]PackageType
 }
 
-func fillFieldList(fs *ast.FieldList) {
+func (v TypeFillingVisitor) fillFieldList(fs *ast.FieldList) {
     if fs != nil {
         for _, l := range fs.List {
             for _, name := range l.Names {
-                name.Obj.Type = getTypes(l.Type)
+                name.Obj.Type = v.getTypes(l.Type)
             }
         }
     }
 }
 
-// We'll have to hide the first 'case *ast.Ident' within a Return case.
-// Then we'll have to create a new 'case *ast.AssignStmt' to handle the new test
 func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
     switch r := n.(type) {
     case *ast.ReturnStmt:
@@ -416,18 +454,18 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
         switch t := r.Lhs[0].(type) {
         case *ast.Ident:
             if t.Obj.Kind == ast.Var {
-                t.Obj.Type = getTypes(r.Rhs[0])
+                t.Obj.Type = v.getTypes(r.Rhs[0])
             }
         }
     case *ast.TypeSpec:
         if r.Name != nil {
-            r.Name.Obj.Type = getTypes(r)
+            r.Name.Obj.Type = v.getTypes(r)
         }
     case *ast.FuncDecl:
-        fillFieldList(r.Type.Params)
-        fillFieldList(r.Type.Results)
+        v.fillFieldList(r.Type.Params)
+        v.fillFieldList(r.Type.Results)
         var fnType FunctionType
-        switch t := getTypes(r).(type) {
+        switch t := v.getTypes(r).(type) {
         case FunctionType:
             fnType = t
         }
@@ -444,15 +482,15 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
             }
         }
     case *ast.FuncLit:
-        fillFieldList(r.Type.Params)
-        fillFieldList(r.Type.Results)
+        v.fillFieldList(r.Type.Params)
+        v.fillFieldList(r.Type.Results)
     default:
     }
     return v
 }
 
-func fillTypes(n ast.Node) {
-    v := TypeFillingVisitor{}
+func fillTypes(n ast.Node, pkg map[string]PackageType) {
+    v := TypeFillingVisitor{pkg:pkg}
     ast.Walk(v, n) 
 }
 
