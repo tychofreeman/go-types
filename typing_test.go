@@ -315,11 +315,11 @@ func TestFillsTypeForTypeConversion(t *testing.T) {
 }
 
 func TestFillsTypeForArrayIndex(t *testing.T) {
-    f := ParseFile("TestFillsTypeForArrayIndex", "package main\nfunc f(ints []int) { a := ints[0] }")
+    f := ParseFile("TestFillsTypeForArrayIndex", "package main\nfunc f(ints []int, floats [2]float, runes [...]rune) { a := ints[0]; b := floats; c := runes[0] }")
     fillTypes(f, nil)
-    types := getTypesForIds(f, "a")
+    types := getTypesForIds(f, "a", "b", "c")
 
-    AssertThat(t, types, HasExactly(IntType()))
+    AssertThat(t, types, HasExactly(IntType(),MakeArray(2,FloatType()), RuneType()))
 }
 
 // Need to handle:

@@ -6,6 +6,7 @@ import (
     "go/ast"
     "go/token"
     "strings"
+    "strconv"
 )
 
 type Type interface {
@@ -178,20 +179,63 @@ func AliasType(aliased Type) Type {
     return &AliasedType{"", aliased, map[string]FunctionType{}}
 }
 
+const (
+    Slice = iota
+    UnknownLen
+    KnownLen
+)
+
+type Len struct {
+    lenType int
+    len int
+}
+
+func (l Len) String() string {
+    switch l.lenType {
+    case Slice:
+        return ""
+    case UnknownLen:
+        return "..."
+    case KnownLen:
+        return fmt.Sprintf("%d", l.len)
+    default:
+        panic(fmt.Sprintf("malformed Len: %v\n", l))
+    }
+}
+
 type SliceType struct {
+    len Len
     subtype Type
 }
 
 func (s SliceType)String() string {
-    return "[]" + s.subtype.String()
+    return fmt.Sprintf("[%v]%v", s.len, s.subtype)
 }
 
 func (s SliceType) Equals(other interface{}) (bool, string) {
     switch other := other.(type) {
     case SliceType:
+        if s.len.lenType != other.len.lenType {
+            return false, fmt.Sprintf("Indexability %v != %v", s.len.lenType, other.len.lenType)
+        }
+        if s.len.lenType == KnownLen && s.len.len != other.len.len {
+            return false, fmt.Sprintf("Array length %v != %v\n", s.len.len, other.len.len)
+        }
         return s.subtype.Equals(other.subtype)
     }
     return false, fmt.Sprintf("SliceType(*) != %T", other)
+}
+
+func MakeSlice(sub Type) Type {
+    return SliceType{Len{Slice,0}, sub}
+}
+
+func MakeArray(len int, sub Type) Type {
+    return SliceType{Len{KnownLen, len}, sub}
+}
+
+func MakeUnlenArray(sub Type) Type {
+    return SliceType{Len{UnknownLen, 0}, sub}
 }
 
 type StructureType struct {
@@ -321,7 +365,19 @@ func (v TypeFillingVisitor) funcType(recv *ast.FieldList, params, results []*ast
 func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
     switch t := n.(type) {
     case *ast.ArrayType:
-        return SliceType{v.getTypes(t.Elt)}
+        subtype := v.getTypes(t.Elt)
+        switch len := t.Len.(type) {
+        case *ast.BasicLit:
+            switch len.Kind {
+            case token.INT:
+                l, _ := strconv.Atoi(len.Value)
+                return MakeArray(l, subtype)
+            }
+        case *ast.Ellipsis:
+            return MakeUnlenArray(subtype)
+        case nil:
+            return MakeSlice(subtype)
+        }
     case *ast.BasicLit:
         switch t.Kind {
         case token.STRING:
