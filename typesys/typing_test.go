@@ -285,7 +285,26 @@ func TestFillsTypeForMethodInAliasedPackage(t *testing.T) {
     AssertThat(t, types, HasExactly(IntType()))
 }
 
-// Need to handle packages aliased with ".".
+func TestFillsTypeForTypeInDotAliasedPackage(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport . \"mypkg\"\nfunc init() { b := ExtTypeA }")
+    aType := AliasedType{"ExtTypeA",IntType(),map[string]FunctionType{}}
+    pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ExtTypeA":aType}}}
+    fillTypes(f, pkg)
+    types := getTypesForIds(f, "b")
+
+    AssertThat(t, types, HasExactly(aType))
+}
+
+func TestFillsTypeForCompositeLit(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport . \"mypkg\"\nfunc init() { b := ExtTypeA{} }")
+    aType := AliasedType{"ExtTypeA",StructType(map[string]Type{"A":IntType()}, []Type{}), map[string]FunctionType{}}
+    pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ExtTypeA":aType}}}
+    fillTypes(f, pkg)
+    types := getTypesForIds(f, "b")
+
+    AssertThat(t, types, HasExactly(aType))
+}
+
 // Need to handle channels.
 // Need to handle other builtin types, which I haven't identified (int*, float*, etc)
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?

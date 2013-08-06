@@ -37,7 +37,7 @@ func (s SimpleType) Equals(other interface{}) (bool,string) {
 }
 
 type PackageType struct {
-    fns map[string]Type
+    types map[string]Type
 }
 
 func (p PackageType) String() string {
@@ -49,8 +49,8 @@ func (p PackageType) Equals(other interface{}) (bool,string) {
     msg := ""
     switch other := other.(type) {
     case PackageType:
-        for k,f := range p.fns {
-            if otherF, ok := other.fns[k]; !ok {
+        for k,f := range p.types {
+            if otherF, ok := other.types[k]; !ok {
                 match = false
                 msg = fmt.Sprintf("Function %s is not found", k)
             } else if ok2, _ := f.Equals(otherF); !ok2 {
@@ -254,7 +254,7 @@ func (v TypeFillingVisitor) getSelectedType(baseType Type, name string) (Type,bo
         }
         return NoneType{}, false
     case PackageType:
-        item, ok := baseType.fns[name]
+        item, ok := baseType.types[name]
         return item, ok
     default:
         fmt.Printf("could not get selected type of %v - %T\n", baseType, baseType)
@@ -338,6 +338,8 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
             }
         }
         return UnknownType("Wierd Call expression")
+    case *ast.CompositeLit:
+        return v.getTypes(t.Type)
     case *ast.FuncDecl:
         results := []*ast.Field{}
         params := []*ast.Field{}
@@ -379,6 +381,14 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
                 }
                 if pkg, ok := v.pkg[pkgName]; ok {
                     return pkg
+                }
+                for alias, pkgName := range v.aliases {
+                    if alias == "." {
+                        pkg := v.pkg[pkgName].types
+                        if identType, ok := pkg[t.Name]; ok {
+                            return identType
+                        }
+                    }
                 }
                 return UnknownType("TYPE IDENT " + t.Name)
             }
