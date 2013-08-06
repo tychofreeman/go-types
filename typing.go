@@ -329,6 +329,8 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         }
     case *ast.CallExpr:
         switch fnName := t.Fun.(type) {
+        // This can be moved into the second switch by creating a 'builtin' package with all of the builtin types...
+        // and having the default case simply return the given type...
         case *ast.Ident:
             lits := map[string]bool{"int":true, "float":true,"char":true,"complex":true,"rune":true}
             if _, ok := lits[fnName.Name]; ok {
@@ -336,7 +338,6 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
             }
         }
         fnType := v.getTypes(t.Fun)
-        fmt.Printf("CallExpr: %T - %T\n", t.Fun, fnType)
         switch fnType := fnType.(type) {
         case FunctionType:
             if len(fnType.returns) > 0 {
