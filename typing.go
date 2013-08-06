@@ -518,8 +518,51 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
     return v
 }
 
+var builtIns PackageType = PackageType{
+    map[string]Type{
+        //"slice" - ?
+        "int":IntType(),
+        "int8":SimpleType{"int8"},
+        "int16":SimpleType{"int16"},
+        "int32":SimpleType{"int32"},
+        "int64":SimpleType{"int64"},
+        "complex64":SimpleType{"complex64"},
+        "complex128":SimpleType{"complex128"},
+        //"real" and "imag" destructuring functions, and "complex" construction function
+        //"recover" and "panic"
+        //"make" and "new"
+        //"delete" and "close"
+        //"true" and "false"
+        "float":FloatType(),
+        "float32":SimpleType{"float32"},
+        "float64":SimpleType{"float64"},
+        "bool":SimpleType{"bool"},
+        "byte":SimpleType{"byte"},
+        //"cap", "copy" and "len":FunctionType{},
+        "string":StringType(),
+        "uint":SimpleType{"uint"},
+        "uint8":SimpleType{"uint8"},
+        "uint16":SimpleType{"uint16"},
+        "uint32":SimpleType{"uint32"},
+        "uint64":SimpleType{"uint64"},
+        "uintptr":SimpleType{"uintptr"},
+    },
+}
+
+func union(a,b map[string]PackageType) map[string]PackageType {
+    out := map[string]PackageType{}
+    f := func(a map[string]PackageType) {
+        for k,v := range a {
+            out[k] = v
+        }
+    }
+    f(a)
+    f(b)
+    return out
+}
+
 func fillTypes(n ast.Node, pkg map[string]PackageType) {
-    v := TypeFillingVisitor{pkg:pkg, aliases:map[string]string{}}
+    v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"}}
     ast.Walk(v, n) 
 }
 
