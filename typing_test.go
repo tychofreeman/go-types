@@ -314,6 +314,19 @@ func TestFillsTypeForTypeConversion(t *testing.T) {
     AssertThat(t, types, HasExactly(IntType()))
 }
 
-// Need to handle channels.
-// Need to handle other builtin types, which I haven't identified (int*, float*, etc)
+func TestFillsTypeForArrayIndex(t *testing.T) {
+    f := ParseFile("TestFillsTypeForArrayIndex", "package main\nfunc f(ints []int) { a := ints[0] }")
+    fillTypes(f, nil)
+    types := getTypesForIds(f, "a")
+
+    AssertThat(t, types, HasExactly(IntType()))
+}
+
+// Need to handle:
+//  channels
+//  pointers
+//  arrays
+//  slices
+//  maps
+
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?

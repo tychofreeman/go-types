@@ -178,6 +178,22 @@ func AliasType(aliased Type) Type {
     return &AliasedType{"", aliased, map[string]FunctionType{}}
 }
 
+type SliceType struct {
+    subtype Type
+}
+
+func (s SliceType)String() string {
+    return "[]" + s.subtype.String()
+}
+
+func (s SliceType) Equals(other interface{}) (bool, string) {
+    switch other := other.(type) {
+    case SliceType:
+        return s.subtype.Equals(other.subtype)
+    }
+    return false, fmt.Sprintf("SliceType(*) != %T", other)
+}
+
 type StructureType struct {
     internals map[string]Type
     anons []Type
@@ -304,6 +320,8 @@ func (v TypeFillingVisitor) funcType(recv *ast.FieldList, params, results []*ast
 
 func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
     switch t := n.(type) {
+    case *ast.ArrayType:
+        return SliceType{v.getTypes(t.Elt)}
     case *ast.BasicLit:
         switch t.Kind {
         case token.STRING:
@@ -325,7 +343,7 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         if xType == yType {
             return xType
         } else {
-            fmt.Printf("Unhandled BinaryExpr: %v vs %v\n", xType, yType)
+            panic(fmt.Sprintf("Unhandled BinaryExpr: %v vs %v\n", xType, yType))
         }
     case *ast.CallExpr:
         fnType := v.getTypes(t.Fun)
@@ -413,6 +431,11 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
     case *ast.SelectorExpr:
         if rtn, ok := v.getSelectedType(v.getTypes(t.X), t.Sel.Name); ok {
             return rtn
+        }
+    case *ast.IndexExpr:
+        switch t := v.getTypes(t.X).(type) {
+        case SliceType:
+            return t.subtype
         }
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
