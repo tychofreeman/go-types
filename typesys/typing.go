@@ -37,7 +37,7 @@ func (s SimpleType) Equals(other interface{}) (bool,string) {
 }
 
 type PackageType struct {
-    fns map[string]FunctionType
+    fns map[string]Type
 }
 
 func (p PackageType) String() string {

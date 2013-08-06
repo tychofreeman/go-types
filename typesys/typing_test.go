@@ -269,7 +269,7 @@ func TestFillsTypeForMethod(t *testing.T) {
 
 func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\nimport \"mypkg\"\nfunc init() { b := mypkg.ReturnsInt() }")
-    pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
+    pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
     fillTypes(f, pkg)
     types := getTypesForIds(f, "b")
 
@@ -278,12 +278,14 @@ func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
 
 func TestFillsTypeForMethodInAliasedPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport mp \"mypkg\"\nfunc init() { b := mp.ReturnsInt() }")
-    pkg := map[string]PackageType{"mypkg":PackageType{map[string]FunctionType{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
+    pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
     fillTypes(f, pkg)
     types := getTypesForIds(f, "b")
 
     AssertThat(t, types, HasExactly(IntType()))
 }
 
-// Need to handle package aliases, and the corner case of ".". That'll be tricky.
+// Need to handle packages aliased with ".".
+// Need to handle channels.
+// Need to handle other builtin types, which I haven't identified (int*, float*, etc)
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
