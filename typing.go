@@ -328,15 +328,6 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
             fmt.Printf("Unhandled BinaryExpr: %v vs %v\n", xType, yType)
         }
     case *ast.CallExpr:
-        switch fnName := t.Fun.(type) {
-        // This can be moved into the second switch by creating a 'builtin' package with all of the builtin types...
-        // and having the default case simply return the given type...
-        case *ast.Ident:
-            lits := map[string]bool{"int":true, "float":true,"char":true,"complex":true,"rune":true}
-            if _, ok := lits[fnName.Name]; ok {
-                return SimpleType{fnName.Name}
-            }
-        }
         fnType := v.getTypes(t.Fun)
         switch fnType := fnType.(type) {
         case FunctionType:
@@ -345,6 +336,8 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
             } else {
                 return NoneType{}
             }
+        case Type:
+            return fnType
         }
         return UnknownType("Wierd Call expression")
     case *ast.CompositeLit:
@@ -372,35 +365,22 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         return v.funcType(nil, params, results)
     case *ast.Ident:
         if t.Obj == nil {
-            switch t.Name {
-            case "int":
-                return IntType()
-            case "string":
-                return StringType()
-            case "float":
-                return FloatType()
-            case "char":
-                return CharType()
-            case "rune":
-                return RuneType()
-            default:
-                pkgName := t.Name
-                if alias, ok := v.aliases[pkgName]; ok {
-                    pkgName = alias
-                }
-                if pkg, ok := v.pkg[pkgName]; ok {
-                    return pkg
-                }
-                for alias, pkgName := range v.aliases {
-                    if alias == "." {
-                        pkg := v.pkg[pkgName].types
-                        if identType, ok := pkg[t.Name]; ok {
-                            return identType
-                        }
+            pkgName := t.Name
+            if alias, ok := v.aliases[pkgName]; ok {
+                pkgName = alias
+            }
+            if pkg, ok := v.pkg[pkgName]; ok {
+                return pkg
+            }
+            for alias, pkgName := range v.aliases {
+                if alias == "." {
+                    pkg := v.pkg[pkgName].types
+                    if identType, ok := pkg[t.Name]; ok {
+                        return identType
                     }
                 }
-                return UnknownType("TYPE IDENT " + t.Name)
             }
+            return UnknownType("TYPE IDENT " + t.Name)
         }
         if t.Obj.Type != nil {
             switch it := t.Obj.Type.(type) {
@@ -546,6 +526,7 @@ var builtIns PackageType = PackageType{
         "uint32":SimpleType{"uint32"},
         "uint64":SimpleType{"uint64"},
         "uintptr":SimpleType{"uintptr"},
+        "rune":RuneType(),
     },
 }
 
