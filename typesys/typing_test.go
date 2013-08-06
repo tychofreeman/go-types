@@ -295,14 +295,15 @@ func TestFillsTypeForTypeInDotAliasedPackage(t *testing.T) {
     AssertThat(t, types, HasExactly(aType))
 }
 
-func TestFillsTypeForCompositeLit(t *testing.T) {
-    f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport . \"mypkg\"\nfunc init() { b := ExtTypeA{} }")
+func TestFillsTypeForCompositeLitWithAndWithoutFields(t *testing.T) {
+    // Interestingly, I don't think we care about the values of the fields within the CompositeLit.
+    f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport . \"mypkg\"\nfunc init() { b := ExtTypeA{}; c := ExtTypeA{0} }")
     aType := AliasedType{"ExtTypeA",StructType(map[string]Type{"A":IntType()}, []Type{}), map[string]FunctionType{}}
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ExtTypeA":aType}}}
     fillTypes(f, pkg)
-    types := getTypesForIds(f, "b")
+    types := getTypesForIds(f, "b", "c")
 
-    AssertThat(t, types, HasExactly(aType))
+    AssertThat(t, types, HasExactly(aType, aType))
 }
 
 // Need to handle channels.
