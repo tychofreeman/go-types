@@ -306,6 +306,14 @@ func TestFillsTypeForCompositeLitWithAndWithoutFields(t *testing.T) {
     AssertThat(t, types, HasExactly(aType, aType))
 }
 
+func TestFillsTypeForTypeConversion(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nfunc init() { a := int(1.0) }")
+    fillTypes(f, nil)
+    types := getTypesForIds(f, "a")
+
+    AssertThat(t, types, HasExactly(IntType()))
+}
+
 // Need to handle channels.
 // Need to handle other builtin types, which I haven't identified (int*, float*, etc)
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
