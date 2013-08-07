@@ -10,7 +10,7 @@ import (
 
 func getTypeOfExpr(expr string) Type {
     i, _ := parser.ParseExpr(expr)
-    return TypeFillingVisitor{nil,nil}.getTypes(i)
+    return TypeFillingVisitor{nil,nil,true}.getTypes(i)
 }
 
 func TestFindsTypeOfStringExpression(t *testing.T) {
@@ -320,6 +320,14 @@ func TestFillsTypeForArrayIndex(t *testing.T) {
     types := getTypesForIds(f, "a", "b", "c")
 
     AssertThat(t, types, HasExactly(IntType(),MakeArray(2,FloatType()), RuneType()))
+}
+
+func TestFillsTypeForPointer(t *testing.T) {
+    f := ParseFile("TestFillsTypeForPointer", "package main\nfunc f(i *int) { a := *i }")
+    fillTypes(f, nil)
+    types := getTypesForIds(f, "a")
+
+    AssertThat(t, types, HasExactly(IntType()))
 }
 
 // Need to handle:

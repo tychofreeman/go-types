@@ -14,6 +14,23 @@ type Type interface {
     Equals(interface{}) (bool,string)
 }
 
+type PointerType struct {
+    wrapped Type
+}
+
+func (p PointerType) String() string {
+    return "*" + p.wrapped.String()
+}
+
+func (p PointerType) Equals(other interface{}) (bool,string) {
+    switch other := other.(type) {
+    case PointerType:
+        eq, msg := p.wrapped.Equals(other.wrapped)
+        return eq, fmt.Sprintf("*%s != *%s (%s)", p.wrapped, other.wrapped, msg)
+    }
+    return false, fmt.Sprintf("PointerType(*) != %T", other)
+}
+
 type NoneType struct{}
 
 func (n NoneType) String() string {
@@ -334,6 +351,7 @@ func FuncType(recv Type, paramList, results []Type) Type {
 
 // Create a FunctionType from the information found in the AST.
 func (v TypeFillingVisitor) funcType(recv *ast.FieldList, params, results []*ast.Field) Type {
+    v.starIsDeref = false
     paramList := []Type{}
     for _, param := range params {
         for _, paramIdent := range param.Names {
@@ -359,6 +377,7 @@ func (v TypeFillingVisitor) funcType(recv *ast.FieldList, params, results []*ast
     }
 
 
+    v.starIsDeref = true
     return FunctionType{receiver:recvType, params:paramList, returns:rtnList}
 }
 
@@ -428,6 +447,7 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         ft := v.funcType(t.Recv, params, results)
         return ft
     case *ast.FuncType:
+        fmt.Printf("FUNC TYPE!!!\n")
         results := []*ast.Field{}
         params := []*ast.Field{}
         if t.Results != nil {
@@ -436,7 +456,9 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         if t.Params != nil {
             params = t.Params.List
         }
-        return v.funcType(nil, params, results)
+        t2 := v.funcType(nil, params, results)
+        fmt.Printf("// END FUN TYPE!!!\n")
+        return t2
     case *ast.Ident:
         if t.Obj == nil {
             pkgName := t.Name
@@ -493,6 +515,18 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         case SliceType:
             return t.subtype
         }
+    case *ast.StarExpr:
+        if v.starIsDeref {
+            switch t := v.getTypes(t.X).(type) {
+            case PointerType:
+                return t.wrapped
+            default:
+                fmt.Printf("Star Expr: Type %T - %v\n", t, t)
+            }
+        } else {
+            fmt.Printf("Creating pointer type around type %v\n", t.X)
+            return PointerType{v.getTypes(t.X)}
+        }
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
@@ -503,6 +537,7 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
 type TypeFillingVisitor struct {
     pkg map[string]PackageType
     aliases map[string]string
+    starIsDeref bool
 }
 
 func (v TypeFillingVisitor) fillFieldList(fs *ast.FieldList) {
@@ -550,8 +585,10 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
             v.aliases[r.Name.Name] = strings.Trim(r.Path.Value, "\"")
         }
     case *ast.FuncDecl:
+        v.starIsDeref = false
         v.fillFieldList(r.Type.Params)
         v.fillFieldList(r.Type.Results)
+        v.starIsDeref = true
         var fnType FunctionType
         switch t := v.getTypes(r).(type) {
         case FunctionType:
@@ -570,8 +607,10 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
             }
         }
     case *ast.FuncLit:
+        v.starIsDeref = false
         v.fillFieldList(r.Type.Params)
         v.fillFieldList(r.Type.Results)
+        v.starIsDeref = true
     default:
     }
     return v
@@ -622,7 +661,7 @@ func union(a,b map[string]PackageType) map[string]PackageType {
 }
 
 func fillTypes(n ast.Node, pkg map[string]PackageType) {
-    v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"}}
+    v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"},starIsDeref:true}
     ast.Walk(v, n) 
 }
 
