@@ -357,5 +357,9 @@ func TestReturnsPackageWithExportedSymbols(t *testing.T) {
 // Need to handle:
 //  channels
 //  func literals?
+//  aliases to functions...
+//  dereferences of aliases to pointers
+
+// Need to be able to parse one namespace which is split into multiple files with cyclic dependencies...
 
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
