@@ -539,8 +539,11 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
             return t.value
         }
     case *ast.UnaryExpr:
-        if t.Op == token.AND {
+        switch t.Op {
+        case token.AND:
             return PointerType{v.getTypes(t.X)}
+        case token.ADD, token.SUB, token.XOR:
+            return v.getTypes(t.X)
         }
     case *ast.StarExpr:
         if v.starIsDeref {

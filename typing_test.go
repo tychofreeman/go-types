@@ -338,9 +338,16 @@ func TestFillsTypeForMap(t *testing.T) {
     AssertThat(t, types, HasExactly(FloatType()))
 }
 
+func TestFillsTypeForNumbersWithUnaryOps(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMap", "package main\nfunc init() { a := -100; b:= +100; c := ^1 }")
+    fillTypes(f, nil)
+    types := getTypesForIds(f, "a", "b", "c")
+
+    AssertThat(t, types, HasExactly(IntType(),IntType(),IntType()))
+}
+
 // Need to handle:
 //  channels
-//  reference (&)
 //  func literals?
 //  lots of unary symbols (-, ^, <-, etc)
 
