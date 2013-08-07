@@ -323,11 +323,11 @@ func TestFillsTypeForArrayIndex(t *testing.T) {
 }
 
 func TestFillsTypeForPointer(t *testing.T) {
-    f := ParseFile("TestFillsTypeForPointer", "package main\nfunc f(i *int) { a := *i }")
+    f := ParseFile("TestFillsTypeForPointer", "package main\nfunc (a *int) f(i *int) { b := *i; c := i }")
     fillTypes(f, nil)
-    types := getTypesForIds(f, "a")
+    types := getTypesForIds(f, "a", "b", "c")
 
-    AssertThat(t, types, HasExactly(IntType()))
+    AssertThat(t, types, HasExactly(PointerType{IntType()}, IntType(), PointerType{IntType()}))
 }
 
 // Need to handle:

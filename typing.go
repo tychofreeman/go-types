@@ -497,6 +497,8 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         switch tt := t.Type.(type) {
         case *ast.Ident:
             return v.getTypes(tt)
+        case *ast.StarExpr:
+            return PointerType{v.getTypes(tt.X)}
         default:
             fmt.Printf("Unhandled Field: %v\n", reflect.TypeOf(tt))
         }
@@ -524,7 +526,6 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
                 fmt.Printf("Star Expr: Type %T - %v\n", t, t)
             }
         } else {
-            fmt.Printf("Creating pointer type around type %v\n", t.X)
             return PointerType{v.getTypes(t.X)}
         }
     default:
@@ -588,6 +589,7 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
         v.starIsDeref = false
         v.fillFieldList(r.Type.Params)
         v.fillFieldList(r.Type.Results)
+        v.fillFieldList(r.Recv)
         v.starIsDeref = true
         var fnType FunctionType
         switch t := v.getTypes(r).(type) {
