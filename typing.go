@@ -569,6 +569,7 @@ type TypeFillingVisitor struct {
     pkg map[string]PackageType
     aliases map[string]string
     starIsDeref bool
+    builtPkg PackageType
 }
 
 func (v TypeFillingVisitor) fillFieldList(fs *ast.FieldList) {
@@ -609,7 +610,9 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
         }
     case *ast.TypeSpec:
         if r.Name != nil {
-            r.Name.Obj.Type = v.getTypes(r)
+            rType := v.getTypes(r)
+            r.Name.Obj.Type = rType
+            v.builtPkg.types[r.Name.Name] = rType
         }
     case *ast.ImportSpec:
         if v.aliases != nil && r.Name != nil {
@@ -625,6 +628,7 @@ func (v TypeFillingVisitor) Visit(n ast.Node) ast.Visitor {
         switch t := v.getTypes(r).(type) {
         case FunctionType:
             fnType = t
+            v.builtPkg.types[r.Name.Name] = fnType
         }
         if r.Name != nil && r.Name.Obj != nil {
             r.Name.Obj.Type = fnType
@@ -692,8 +696,9 @@ func union(a,b map[string]PackageType) map[string]PackageType {
     return out
 }
 
-func fillTypes(n ast.Node, pkg map[string]PackageType) {
-    v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"},starIsDeref:true}
+func fillTypes(n ast.Node, pkg map[string]PackageType) PackageType {
+    v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"},starIsDeref:true,builtPkg:PackageType{types:map[string]Type{}}}
     ast.Walk(v, n) 
+    return v.builtPkg
 }
 

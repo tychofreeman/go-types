@@ -10,7 +10,7 @@ import (
 
 func getTypeOfExpr(expr string) Type {
     i, _ := parser.ParseExpr(expr)
-    return TypeFillingVisitor{nil,nil,true}.getTypes(i)
+    return TypeFillingVisitor{nil,nil,true,PackageType{}}.getTypes(i)
 }
 
 func TestFindsTypeOfStringExpression(t *testing.T) {
@@ -346,9 +346,16 @@ func TestFillsTypeForNumbersWithUnaryOps(t *testing.T) {
     AssertThat(t, types, HasExactly(IntType(),IntType(),IntType()))
 }
 
+func TestReturnsPackageWithExportedSymbols(t *testing.T) {
+    f := ParseFile("TestReturnsPackageWithExportedSymbols", "package main\ntype A int\nfunc B() {}")
+    pkg := fillTypes(f, nil)
+   
+    AssertThat(t, pkg.types["A"], Equals(AliasedType{"",IntType(),map[string]FunctionType{}}))
+    AssertThat(t, pkg.types["B"], Equals(FuncType(NoneType{},[]Type{},[]Type{})))
+}
+
 // Need to handle:
 //  channels
 //  func literals?
-//  lots of unary symbols (-, ^, <-, etc)
 
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
