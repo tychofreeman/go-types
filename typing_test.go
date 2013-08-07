@@ -325,8 +325,7 @@ func TestFillsTypeForArrayIndex(t *testing.T) {
 // Need to handle:
 //  channels
 //  pointers
-//  arrays
-//  slices
 //  maps
+//  func literals?
 
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
