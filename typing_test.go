@@ -330,9 +330,16 @@ func TestFillsTypeForPointer(t *testing.T) {
     AssertThat(t, types, HasExactly(PointerType{IntType()}, IntType(), PointerType{IntType()}))
 }
 
+func TestFillsTypeForMap(t *testing.T) {
+    f := ParseFile("TestFillsTypeForMap", "package main\nfunc f(m map[string]float) { a := m[\"hi\"] }")
+    fillTypes(f, nil)
+    types := getTypesForIds(f, "a")
+
+    AssertThat(t, types, HasExactly(FloatType()))
+}
+
 // Need to handle:
 //  channels
-//  pointers
 //  maps
 //  func literals?
 

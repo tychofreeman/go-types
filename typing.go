@@ -14,6 +14,25 @@ type Type interface {
     Equals(interface{}) (bool,string)
 }
 
+type MapType struct {
+    key, value Type
+}
+
+func (m MapType) String() string {
+    return "map[" + m.key.String() + "]" + m.value.String()
+}
+
+func (m MapType) Equals(other interface{}) (bool,string) {
+    switch other := other.(type) {
+    case MapType:
+        keyEq, keyMsg := m.key.Equals(other.key)
+        valueEq, valueMsg := m.value.Equals(other.value)
+        msg := "KEYS: " + keyMsg + " AND VALUES: " + valueMsg
+        return (keyEq && valueEq), msg
+    }
+    return false, fmt.Sprintf("MapType(*,*) != %T\n", other)
+}
+
 type PointerType struct {
     wrapped Type
 }
@@ -516,6 +535,8 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         switch t := v.getTypes(t.X).(type) {
         case SliceType:
             return t.subtype
+        case MapType:
+            return t.value
         }
     case *ast.StarExpr:
         if v.starIsDeref {
@@ -528,6 +549,8 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         } else {
             return PointerType{v.getTypes(t.X)}
         }
+    case *ast.MapType:
+        return MapType{v.getTypes(t.Key), v.getTypes(t.Value)}
     default:
         fmt.Printf("Unhandled Node: %v\n", reflect.TypeOf(n))
     }
