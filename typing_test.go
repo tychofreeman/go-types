@@ -323,11 +323,11 @@ func TestFillsTypeForArrayIndex(t *testing.T) {
 }
 
 func TestFillsTypeForPointer(t *testing.T) {
-    f := ParseFile("TestFillsTypeForPointer", "package main\nfunc (a *int) f(i *int) { b := *i; c := i }")
+    f := ParseFile("TestFillsTypeForPointer", "package main\nfunc (a *int) f(i *int) { b := *i; c := i; d := &i }")
     fillTypes(f, nil)
-    types := getTypesForIds(f, "a", "b", "c")
+    types := getTypesForIds(f, "a", "b", "c", "d")
 
-    AssertThat(t, types, HasExactly(PointerType{IntType()}, IntType(), PointerType{IntType()}))
+    AssertThat(t, types, HasExactly(PointerType{IntType()}, IntType(), PointerType{IntType()}, PointerType{PointerType{IntType()}}))
 }
 
 func TestFillsTypeForMap(t *testing.T) {
@@ -340,7 +340,8 @@ func TestFillsTypeForMap(t *testing.T) {
 
 // Need to handle:
 //  channels
-//  maps
+//  reference (&)
 //  func literals?
+//  lots of unary symbols (-, ^, <-, etc)
 
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
