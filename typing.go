@@ -531,6 +531,7 @@ func (v TypeFillingVisitor) getTypes(n ast.Node) Type {
         if rtn, ok := v.getSelectedType(v.getTypes(t.X), t.Sel.Name); ok {
             return rtn
         }
+        fmt.Printf("Could not find types for %s.%s\n", t.X, t.Sel.Name)
     case *ast.IndexExpr:
         switch t := v.getTypes(t.X).(type) {
         case SliceType:
