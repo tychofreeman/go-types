@@ -53,7 +53,7 @@ func TestFillsTypeOfExpression(t *testing.T) {
             switch i3 := rtn2.Results[0].(type) {
             case *ast.Ident:
                 AssertThat(t, i3.Obj.Type, Equals(nil))
-                fillTypes(i, nil)
+                FillTypes(i, nil)
                 AssertThat(t, i3.Obj.Type, Equals(IntType()))
             default:
                 t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
@@ -115,7 +115,7 @@ func TestFillsTypeOfVarInAssignment(t *testing.T) {
                     switch i3 := rtn2.Lhs[0].(type) {
                     case *ast.Ident:
                         AssertThat(t, i3.Obj.Type, Equals(nil))
-                        fillTypes(n, nil)
+                        FillTypes(n, nil)
                         AssertThat(t, i3.Obj.Type, Equals(IntType()))
                     default:
                         t.Error("Expected to find an identifier at Expr.FuncLit.Body.List[0].ReturnStmt.Results[0]")
@@ -138,7 +138,7 @@ func _TestFillsTypeOfVarAssignedToCast(t *testing.T) {
                 switch lhs := assign.Lhs[0].(type) {
                     case *ast.Ident:
                         AssertThat(t, lhs.Obj.Type, Equals(nil))
-                        fillTypes(n, nil)
+                        FillTypes(n, nil)
                         AssertThat(t, lhs.Obj.Type, Equals(FloatType()))
                 }
             }
@@ -149,7 +149,7 @@ func _TestFillsTypeOfVarAssignedToCast(t *testing.T) {
 
 func TestFillsTypeOfFuncName(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFuncName", "package main\nfunc f(a int) float { return float(a) }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     v := FuncVisitor{
         func(n ast.Node) {
             switch ident := n.(type) {
@@ -169,42 +169,42 @@ func TestFillsTypeOfFuncName(t *testing.T) {
 
 func TestFillsVarAssignedToCallOfFunc(t *testing.T) {
     f := ParseFile("TestFillsVarAssignedToCallOfFunc", "package main\nfunc f(a int) int { return a * 2 }\nfunc g() {b := f(3)}")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "b")
     AssertThat(t, types, HasExactly(IntType()))
 }
 
 func TestFillsVarWithTypeAlias(t *testing.T) {
     f := ParseFile("TestFillsvarWithTypeAlias", "package main\ntype A int\nfunc f(a A) { b := A(a) }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a")
     AssertThat(t, types, HasExactly(AliasType(IntType()),AliasType(IntType())))
 }
 
 func TestFillsMultipleParamsInFuncDef(t *testing.T) {
     f := ParseFile("TestFillsMultipleParamsInFuncDef", "package main\nfunc f(a, b int, c float) { }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a","b","c")
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
 }
 
 func TestFillsAllReturnValuesInFuncDef(t *testing.T) {
     f := ParseFile("TestFillsAllReturnValuesInFuncDef", "package main\nfunc f() (a, b int, c float) { return 0,0,1.0 }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a","b","c")
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType()))
 }
 
 func TestFillsAllReturnAndParamTypesInFuncLiteral(t *testing.T) {
     f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc init() { fn := func(a,b int, c float) (d,e string, f rune) { return } }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a", "b", "c", "d", "e", "f")
     AssertThat(t, types, HasExactly(IntType(),IntType(),FloatType(),StringType(),StringType(),RuneType()))
 }
 
 func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
     f := ParseFile("TestFillsAllReturnAndParamTypesInFuncLiteral", "package main\nfunc fn(a,b int, c float) (d,e string, f rune) { return }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "fn")
 
     AssertThat(t, types, HasExactly(FunctionType{nil, []Type{IntType(),IntType(),FloatType()}, []Type{StringType(),StringType(),RuneType()}}))
@@ -212,7 +212,7 @@ func TestFindsCorrectTypeForParamsInFunctionIdent(t *testing.T) {
 
 func TestFillsIdentForStructType(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a")
 
     aType := AliasType(StructType(map[string]Type{"B":IntType()}, nil))
@@ -221,7 +221,7 @@ func TestFillsIdentForStructType(t *testing.T) {
 
 func TestFillsAllIdentsForStructType(t *testing.T) {
     f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\n func f(a A) { c := a.B }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a")
 
     aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
@@ -230,7 +230,7 @@ func TestFillsAllIdentsForStructType(t *testing.T) {
 
 func TestFillsAllAnonFieldsForStructType(t *testing.T) {
     f := ParseFile("TestFillsAllIdentsForStructType", "package main\ntype A struct {\nB,C int\nD float\n}\ntype E struct {\nA\n}\n func f(e E) { c := e.B }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "e")
 
     aType := AliasType(StructType(map[string]Type{"B":IntType(), "C":IntType(), "D":FloatType()}, nil))
@@ -240,7 +240,7 @@ func TestFillsAllAnonFieldsForStructType(t *testing.T) {
 
 func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldWithinStruct", "package main\ntype A struct {\nB int\n}\n func f(a A) { c := a.B }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "c")
 
     AssertThat(t, types, HasExactly(IntType()))
@@ -248,7 +248,7 @@ func TestFillsTypeOfFieldWithinStruct(t *testing.T) {
 
 func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
     f := ParseFile("TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct", "package main\ntype A struct {\nB int\n}\ntype D struct {\nA\n}\n func f(a D) { c := a.B }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "c")
 
     AssertThat(t, types, HasExactly(IntType()))
@@ -257,7 +257,7 @@ func TestFillsTypeOfFieldOfAnonymousSubfieldWithinStruct(t *testing.T) {
 // Next, add selection of methods...
 func TestFillsTypeForMethod(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\ntype A int\nfunc (a A) Inc() A { return A(a + 1) }\nfunc f(a A) { b := a.Inc }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "b")
 
     intAlias := AliasedType{"", IntType(), map[string]FunctionType{}}
@@ -270,7 +270,7 @@ func TestFillsTypeForMethod(t *testing.T) {
 func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethod", "package main\nimport \"mypkg\"\nfunc init() { b := mypkg.ReturnsInt() }")
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
-    fillTypes(f, pkg)
+    FillTypes(f, pkg)
     types := getTypesForIds(f, "b")
 
     AssertThat(t, types, HasExactly(IntType()))
@@ -279,7 +279,7 @@ func TestFillsTypeForMethodInAnotherPackage(t *testing.T) {
 func TestFillsTypeForMethodInAliasedPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport mp \"mypkg\"\nfunc init() { b := mp.ReturnsInt() }")
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ReturnsInt":FunctionType{nil,[]Type{},[]Type{IntType()}}}}}
-    fillTypes(f, pkg)
+    FillTypes(f, pkg)
     types := getTypesForIds(f, "b")
 
     AssertThat(t, types, HasExactly(IntType()))
@@ -289,7 +289,7 @@ func TestFillsTypeForTypeInDotAliasedPackage(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport . \"mypkg\"\nfunc init() { b := ExtTypeA }")
     aType := AliasedType{"ExtTypeA",IntType(),map[string]FunctionType{}}
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ExtTypeA":aType}}}
-    fillTypes(f, pkg)
+    FillTypes(f, pkg)
     types := getTypesForIds(f, "b")
 
     AssertThat(t, types, HasExactly(aType))
@@ -300,7 +300,7 @@ func TestFillsTypeForCompositeLitWithAndWithoutFields(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nimport . \"mypkg\"\nfunc init() { b := ExtTypeA{}; c := ExtTypeA{0} }")
     aType := AliasedType{"ExtTypeA",StructType(map[string]Type{"A":IntType()}, []Type{}), map[string]FunctionType{}}
     pkg := map[string]PackageType{"mypkg":PackageType{map[string]Type{"ExtTypeA":aType}}}
-    fillTypes(f, pkg)
+    FillTypes(f, pkg)
     types := getTypesForIds(f, "b", "c")
 
     AssertThat(t, types, HasExactly(aType, aType))
@@ -308,7 +308,7 @@ func TestFillsTypeForCompositeLitWithAndWithoutFields(t *testing.T) {
 
 func TestFillsTypeForTypeConversion(t *testing.T) {
     f := ParseFile("TestFillsTypeForMethodInAliasedPackage", "package main\nfunc init() { a := int(1.0) }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a")
 
     AssertThat(t, types, HasExactly(IntType()))
@@ -316,7 +316,7 @@ func TestFillsTypeForTypeConversion(t *testing.T) {
 
 func TestFillsTypeForArrayIndex(t *testing.T) {
     f := ParseFile("TestFillsTypeForArrayIndex", "package main\nfunc f(ints []int, floats [2]float, runes [...]rune) { a := ints[0]; b := floats; c := runes[0] }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a", "b", "c")
 
     AssertThat(t, types, HasExactly(IntType(),MakeArray(2,FloatType()), RuneType()))
@@ -324,7 +324,7 @@ func TestFillsTypeForArrayIndex(t *testing.T) {
 
 func TestFillsTypeForPointer(t *testing.T) {
     f := ParseFile("TestFillsTypeForPointer", "package main\nfunc (a *int) f(i *int) { b := *i; c := i; d := &i }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a", "b", "c", "d")
 
     AssertThat(t, types, HasExactly(PointerType{IntType()}, IntType(), PointerType{IntType()}, PointerType{PointerType{IntType()}}))
@@ -332,7 +332,7 @@ func TestFillsTypeForPointer(t *testing.T) {
 
 func TestFillsTypeForMap(t *testing.T) {
     f := ParseFile("TestFillsTypeForMap", "package main\nfunc f(m map[string]float) { a := m[\"hi\"] }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a")
 
     AssertThat(t, types, HasExactly(FloatType()))
@@ -340,7 +340,7 @@ func TestFillsTypeForMap(t *testing.T) {
 
 func TestFillsTypeForNumbersWithUnaryOps(t *testing.T) {
     f := ParseFile("TestFillsTypeForMap", "package main\nfunc init() { a := -100; b:= +100; c := ^1 }")
-    fillTypes(f, nil)
+    FillTypes(f, nil)
     types := getTypesForIds(f, "a", "b", "c")
 
     AssertThat(t, types, HasExactly(IntType(),IntType(),IntType()))
@@ -348,7 +348,7 @@ func TestFillsTypeForNumbersWithUnaryOps(t *testing.T) {
 
 func TestReturnsPackageWithExportedSymbols(t *testing.T) {
     f := ParseFile("TestReturnsPackageWithExportedSymbols", "package main\ntype A int\nfunc B() {}")
-    pkg := fillTypes(f, nil)
+    pkg := FillTypes(f, nil)
    
     AssertThat(t, pkg.types["A"], Equals(AliasedType{"",IntType(),map[string]FunctionType{}}))
     AssertThat(t, pkg.types["B"], Equals(FuncType(NoneType{},[]Type{},[]Type{})))

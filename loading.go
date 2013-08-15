@@ -55,7 +55,7 @@ func (p *Parser)Parse(fname string) (map[string]*ast.Package,error) {
         for pkgName, pkg := range pkgs {
             stuff2[pkgName] = pkg
             for _, file := range pkg.Files {
-                constructed := fillTypes(file, p.pkgs)
+                constructed := FillTypes(file, p.pkgs)
                 p.pkgs[pkgName] = constructed
             }
         }

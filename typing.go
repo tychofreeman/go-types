@@ -697,7 +697,7 @@ func union(a,b map[string]PackageType) map[string]PackageType {
     return out
 }
 
-func fillTypes(n ast.Node, pkg map[string]PackageType) PackageType {
+func FillTypes(n ast.Node, pkg map[string]PackageType) PackageType {
     v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"},starIsDeref:true,builtPkg:PackageType{types:map[string]Type{}}}
     ast.Walk(v, n) 
     return v.builtPkg
