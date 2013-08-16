@@ -697,9 +697,12 @@ func union(a,b map[string]PackageType) map[string]PackageType {
     return out
 }
 
+func MakeTFVisitor(pkg map[string]PackageType) TypeFillingVisitor {
+    return TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"},starIsDeref:true,builtPkg:PackageType{types:map[string]Type{}}}
+}
+
 func FillTypes(n ast.Node, pkg map[string]PackageType) PackageType {
-    v := TypeFillingVisitor{pkg:union(pkg, map[string]PackageType{"builtins":builtIns}), aliases:map[string]string{".":"builtins"},starIsDeref:true,builtPkg:PackageType{types:map[string]Type{}}}
+    v := MakeTFVisitor(pkg)
     ast.Walk(v, n) 
     return v.builtPkg
 }
-
