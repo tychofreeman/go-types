@@ -706,3 +706,8 @@ func FillTypes(n ast.Node, pkg map[string]PackageType) PackageType {
     ast.Walk(v, n) 
     return v.builtPkg
 }
+
+func GetTypeOf(n ast.Node, pkg map[string]PackageType) Type {
+    v := MakeTFVisitor(pkg)
+    return v.getTypes(n)
+}
