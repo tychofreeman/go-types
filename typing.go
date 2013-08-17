@@ -81,6 +81,10 @@ func MakePackageType() PackageType {
     return PackageType{map[string]Type{}}
 }
 
+func (p *PackageType)Add(name string, typ Type) {
+    p.types[name] = typ
+}
+
 func (p PackageType) String() string {
     return "pkg"
 }
