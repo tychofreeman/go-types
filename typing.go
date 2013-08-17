@@ -77,6 +77,10 @@ type PackageType struct {
     types map[string]Type
 }
 
+func MakePackageType() PackageType {
+    return PackageType{map[string]Type{}}
+}
+
 func (p PackageType) String() string {
     return "pkg"
 }

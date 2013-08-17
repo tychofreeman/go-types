@@ -363,3 +363,4 @@ func TestReturnsPackageWithExportedSymbols(t *testing.T) {
 // Need to be able to parse one namespace which is split into multiple files with cyclic dependencies...
 
 // Also, currently I can't have a package name and a variable name conflict. Is that ok?
+
